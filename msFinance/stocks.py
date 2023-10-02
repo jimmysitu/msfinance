@@ -97,7 +97,7 @@ class StockBase:
         while not os.path.exists(tmp_file):
             time.sleep(1)
 
-        os.rename(tmp_file, self.download + f"/{market_name}_{stock_symbol}_income_statement_{period}_{type}.xls")
+        os.rename(tmp_file, self.download_dir + f"/{market_name}_{stock_symbol}_income_statement_{period}_{type}.xls")
 
 # End of class StockBase
 
