@@ -1,14 +1,17 @@
 
 import os
 import time
-import sys
+import re
+import sqlite3
+import requests
+import pandas as pd
 
 from selenium import webdriver
 from selenium.webdriver.common.keys import Keys
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
-
+from selenium.webdriver.common.proxy import Proxy, ProxyType
 # For Chrome driver
 from webdriver_manager.chrome import ChromeDriverManager
 
@@ -24,6 +27,8 @@ js_code = """
         console.log('Mouseover event:', event);
     });
 """
+
+# Mapping statistics string to statistics file name
 statistics_filename = {
     'Growth':                       'growthTable',
     'Operating and Efficiency':     'operatingAndEfficiency',
@@ -32,7 +37,7 @@ statistics_filename = {
 }
 
 class StockBase:
-    def __init__(self, debug=False, browser='firefox'):
+    def __init__(self, debug=False, browser='firefox', session='/tmp/msfinance/msfinance.db', proxy=None):
         self.debug = debug
         if('chrome' == browser):
             pass
@@ -41,7 +46,7 @@ class StockBase:
             self.options = webdriver.FirefoxOptions()
 
             # Settting download staff
-            self.download_dir = '/tmp/downloads/' + str(os.getpid())
+            self.download_dir = '/tmp/msfinance/' + str(os.getpid())
             self.options.set_preference("browser.download.folderList", 2)
             self.options.set_preference("browser.download.dir", self.download_dir)
             self.options.set_preference("browser.download.useDownloadDir", True)
@@ -55,17 +60,73 @@ class StockBase:
             if not debug:
                 self.options.add_argument("-headless")
 
+            self.webproxy = None
+            if proxy:
+                [protocal, host, port] = re.split(r'://|:', proxy)
+                # Use set_preference method can enable the DNS proxy
+                self.options.set_preference('network.proxy.type', 1)
+                if 'socks5' == protocal:
+                    self.options.set_preference('network.proxy.socks', host)
+                    self.options.set_preference('network.proxy.socks_port', int(port))
+                    self.options.set_preference('network.proxy.socks_version', 5)
+                    self.options.set_preference('network.proxy.socks_remote_dns', True)
+                else:
+                    print("No supported proxy protocal")
+                    exit(1)
+
+#                # May works for Chrome                                     
+#                self.options.proxy = Proxy({
+#                   'proxyType': ProxyType.MANUAL,
+#                   'socksProxy': '127.0.0.1:1088',
+#                   'socksVersion': 5,
+#                })
+#                # Or
+#                self.options.add_argument(f"--proxy-server={proxy}")
+
+
             self.driver = webdriver.Firefox(
                 service=webdriver.FirefoxService(GeckoDriverManager().install()),
-                options=self.options
+                options=self.options,
             )
+
+        # Initial session storage
+        if session:
+            os.makedirs(os.path.dirname(session), exist_ok=True)
+            self.db = sqlite3.connect(session)
+        else:
+            self.db = None 
+
+        # Setup proxies of requests
+        self.proxies = {
+            "http": proxy,
+            "https": proxy,
+        }
 
     def __del__(self):
         if not self.debug:
             self.driver.close()
 
-    def _get_valuation(self, stock_symbol, market_name, statistics):
-        url = f"https://www.morningstar.com/stocks/{market_name}/{stock_symbol}/valuation"
+        # Close database
+        if self.db:
+            self.db.close()
+
+    def _get_valuation(self, ticker, exchange, statistics, update=False):
+
+        # Compose an unique ID for database table and file name
+        unique_id = f"{ticker}_{exchange}_{statistics}".replace(' ', '_').lower()
+        
+        if not update and self.db:
+            # Not force to update, check database first
+            try:
+                query = f"SELECT * FROM {unique_id}"
+                df = pd.read_sql_query(query, self.db)
+                return df
+            except pd.errors.DatabaseError as e:
+                print(f"{unique_id} is not found in database, pull it from the website")
+                pass
+        
+        # Fetch data from website starts here
+        url = f"https://www.morningstar.com/stocks/{exchange}/{ticker}/valuation"
         self.driver.get(url)
 
         statistics_button = self.driver.find_element(By.XPATH, f"//button[contains(., '{statistics}')]")
@@ -76,20 +137,39 @@ class StockBase:
         )
         export_button.click()
         
+
         # Wait download is done
         tmp_string = statistics_filename[statistics]
-
         tmp_file = self.download_dir + f"/{tmp_string}.xls"
         while not os.path.exists(tmp_file):
             time.sleep(1)
 
-        tmp_string = tmp_string.replace(' ', '_').lower()
-        statistics_file = self.download_dir + f"/{stock_symbol}_{market_name}_{tmp_string}.xls"
+        statistics_file = self.download_dir + f"/{unique_id}.xls"
         os.rename(tmp_file, statistics_file)
-        return (statistics_file)
 
-    def _get_financials(self, stock_symbol, market_name, statement, period='Annual', stage='Restated'):
-        url = f"https://www.morningstar.com/stocks/{market_name}/{stock_symbol}/financials"
+        if self.db:
+            df = pd.read_excel(statistics_file)
+            df.to_sql(unique_id, self.db, if_exists='replace', index=False)
+
+        return df
+
+    def _get_financials(self, ticker, exchange, statement, period='Annual', stage='Restated', update=False):
+        
+        # Compose an unique ID for database table and file name
+        unique_id = f"{ticker}_{exchange}_{statement}_{period}_{stage}".replace(' ', '_').lower()
+        
+        if not update and self.db:
+            # Not force to update, check database first
+            try:
+                query = f"SELECT * FROM {unique_id}"
+                df = pd.read_sql_query(query, self.db)
+                return df
+            except pd.errors.DatabaseError as e:
+                print(f"{unique_id} is not found in database, pull it from the website")
+                pass
+
+        # Fetch data from website starts here
+        url = f"https://www.morningstar.com/stocks/{exchange}/{ticker}/financials"
         self.driver.get(url)
 
         # Select income statement
@@ -134,104 +214,168 @@ class StockBase:
         while not os.path.exists(tmp_file):
             time.sleep(1)
 
-        tmp_string = f"{statement}_{period}_{stage}".replace(' ', '_').lower()
-        statement_file = self.download_dir + f"/{stock_symbol}_{market_name}_{tmp_string}.xls"
+        statement_file = self.download_dir + f"/{unique_id}.xls"
         os.rename(tmp_file, statement_file)
-        return (statement_file)
     
-    # API starts from here
-    def get_growth(self, stock_symbol, market_name):
+        if self.db:
+            df = pd.read_excel(statement_file)
+            df.to_sql(unique_id, self.db, if_exists='replace', index=False)
+
+        return df
+
+# End of class StockBase
+
+class Stock(StockBase):
+    '''
+    Get stock financials statements and valuations statistics
+    '''
+    def get_growth(self, ticker, exchange, update=False):
         '''
         Get growth statistics of stock
         
         Args:
-            stock_symbol: Stock symbol
-            market_name: Market name
+            ticker: Stock symbol
+            exchange: Exchange name
+            update: Force update data from website
         Returns:
-            File name with full path of the statistics, in xls format
+            DataFrame of statistics
         '''
         statistics = 'Growth'
-        return self._get_valuation(stock_symbol, market_name, statistics)
+        return self._get_valuation(ticker, exchange, statistics)
     
-    def get_operating_and_efficiency(self, stock_symbol, market_name):
+    def get_operating_and_efficiency(self, ticker, exchange):
         '''
         Get operating and efficiency statistics of stock
         
         Args:
-            stock_symbol: Stock symbol
-            market_name: Market name
+            ticker: Stock symbol
+            exchange: Exchange name
         Returns:
-            File name with full path of the statistics, in xls format
+            DataFrame of statistics
         '''
         statistics = 'Operating and Efficiency'
-        return self._get_valuation(stock_symbol, market_name, statistics)
+        return self._get_valuation(ticker, exchange, statistics)
     
-    def get_financial_health(self, stock_symbol, market_name):
+    def get_financial_health(self, ticker, exchange):
         '''
         Get financial health statistics of stock
         
         Args:
-            stock_symbol: Stock symbol
-            market_name: Market name
+            ticker: Stock symbol
+            exchange: Exchange name
         Returns:
-            File name with full path of the statistics, in xls format
+            DataFrame of statistics
         '''
         statistics = 'Financial Health'
-        return self._get_valuation(stock_symbol, market_name, statistics)
+        return self._get_valuation(ticker, exchange, statistics)
     
-    def get_cash_flow(self, stock_symbol, market_name):
+    def get_cash_flow(self, ticker, exchange):
         '''
         Get cash flow statistics of stock
+        
         Args:
-            stock_symbol: Stock symbol
-            market_name: Market name
+            ticker: Stock symbol
+            exchange: Exchange name
         Returns:
-            File name with full path of the statistics, in xls format
+            DataFrame of statistics
         '''
         statistics = 'Cash Flow'
-        return self._get_valuation(stock_symbol, market_name, statistics)
+        return self._get_valuation(ticker, exchange, statistics)
+
+    def get_valuations(self, ticker, exchange):
+        '''
+        Get all valuations of stock
         
-    def get_income_statement(self, stock_symbol, market_name, period='Annual', stage='Restated'):
+        Args:
+            ticker: Stock symbol
+            exchange: Exchange name
+        Returns:
+            DataFrame list of statistics
+        '''
+
+        self.valuations = []
+        for statistics in ['Growth', 'Operating and Efficiency', 'Financial Health','Cash Flow']:
+            df = self._get_valuation(ticker, exchange, statistics)
+            self.valuations.append(df)
+        
+        return self.valuations
+
+    def get_income_statement(self, ticker, exchange, period='Annual', stage='Restated'):
         '''
         Get income statement of stock
+        
         Args:
-            stock_symbol: Stock symbol
-            market_name: Market name
+            ticker: Stock symbol
+            exchange: Exchange name
             period: Period of statement, which can be Annual, Quarterly
             stage: Stage of statement, which can be 'As Originally Reported', 'Restated'
         Returns:
-            File name with full path of the statement, in xls format
+            DataFrame of income statement
         '''
         statement = 'Income Statement'
-        return self._get_financials(stock_symbol, market_name, statement, period, stage)
+        return self._get_financials(ticker, exchange, statement, period, stage)
 
-    def get_balance_sheet_statement(self, stock_symbol, market_name, period='Annual', stage='Restated'):
+    def get_balance_sheet_statement(self, ticker, exchange, period='Annual', stage='Restated'):
         '''
         Get balance sheet statement of stock
+        
         Args:
-            stock_symbol: Stock symbol
-            market_name: Market name
+            ticker: Stock symbol
+            exchange: Exchange name
             period: Period of statement, which can be Annual, Quarterly
             stage: Stage of statement, which can be 'As Originally Reported', 'Restated'
         Returns:
-            File name with full path of the statement, in xls format
+            DataFrame of balance sheet statement
         '''
         statement = 'Balance Sheet'
-        return self._get_financials(stock_symbol, market_name, statement, period, stage)
+        return self._get_financials(ticker, exchange, statement, period, stage)
 
-    def get_cash_flow_statement(self, stock_symbol, market_name, period='Annual', stage='Restated'):
+    def get_cash_flow_statement(self, ticker, exchange, period='Annual', stage='Restated'):
         '''
         Get cash flow statement of stock
+        
         Args:
-            stock_symbol: Stock symbol
-            market_name: Market name
+            ticker: Stock symbol
+            exchange: Exchange name
             period: Period of statement, which can be Annual, Quarterly
             stage: Stage of statement, which can be 'As Originally Reported', 'Restated'
         Returns:
-            File name with full path of the statement, in xls format
+            DataFrame of cash flow statement
         '''
         statement = 'Cash Flow'
-        return self._get_financials(stock_symbol, market_name, statement, period, stage)
+        return self._get_financials(ticker, exchange, statement, period, stage)
 
-# End of class StockBase
+    def get_financials(self, ticker, exchange, period='Annual', stage='Restated'):
+        '''
+        Get all financials statements of stock
+        
+        Args:
+            ticker: Stock symbol
+            exchange: Exchange name
+            period: Period of statement, which can be Annual, Quarterly
+            stage: Stage of statement, which can be 'As Originally Reported', 'Restated'
+        Returns:
+            DataFrame list of financials statements
+        '''
 
+        self.financials = []
+        for statement in ['Income Statement', 'Balance Sheet', 'Cash Flow']:
+            df = self._get_financials(ticker, exchange, statement, period, stage)
+            self.financials.append(df)
+
+        return self.financials
+
+    def get_sp500_tickers(self):
+        '''
+        Get tickers of sp500
+
+        Returns:
+            List of ticker names
+        '''
+        url = "https://en.wikipedia.org/wiki/List_of_S%26P_500_companies"
+        response = requests.get(url, proxies=self.proxies)
+        tables = pd.read_html(response.text)
+        symbols = tables[0]['Symbol'].tolist()
+        return symbols
+
+# End of class Stock
