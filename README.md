@@ -11,7 +11,7 @@ msfinance offers  Pythonic way to download stocks financial data from [morningst
 
 
 ## TODO
-- [] Add 'last updated' to database record
-- [] Add tickers from HK exchanges
-- [] Add docs in docs directory for readthedoc.io
-- [] Add setup.py for pip package
+- [  ] Add 'last updated' to database record
+- [  ] Add tickers from HK exchanges
+- [  ] Add docs in docs directory for readthedoc.io
+- [  ] Add setup.py for pip package
