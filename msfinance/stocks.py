@@ -1,7 +1,9 @@
 
 import os
-import time
+import shutil
 import re
+import time
+import json
 import sqlite3
 import requests
 import pandas as pd
@@ -18,22 +20,12 @@ from webdriver_manager.chrome import ChromeDriverManager
 # Form Firefox driver
 from webdriver_manager.firefox import GeckoDriverManager
 
-# Inject JavaScript code to capture events
-js_code = """
-    document.addEventListener('click', function(event) {
-        console.log('Click event:', event);
-    });
-    document.addEventListener('mouseover', function(event) {
-        console.log('Mouseover event:', event);
-    });
-"""
-
 # Mapping statistics string to statistics file name
 statistics_filename = {
     'Growth':                       'growthTable',
     'Operating and Efficiency':     'operatingAndEfficiency',
     'Financial Health':             'financialHealth',
-    'Cash Flow':                    'cashFlow'
+    'Cash Flow':                    'cashFlow',
 }
 
 class StockBase:
@@ -50,6 +42,8 @@ class StockBase:
             self.options.set_preference("browser.download.folderList", 2)
             self.options.set_preference("browser.download.dir", self.download_dir)
             self.options.set_preference("browser.download.useDownloadDir", True)
+            self.options.set_preference("browser.download.viewableInternally.enabledTypes", "")
+            self.options.set_preference("browser.download.manager.showWhenStarting", False)
             self.options.set_preference("browser.helperApps.neverAsk.saveToDisk", "application/octet-stream")
             # Enable cache
             self.options.set_preference("browser.cache.disk.enable", True);
@@ -91,7 +85,9 @@ class StockBase:
 
         # Initial session storage
         if session:
-            os.makedirs(os.path.dirname(session), exist_ok=True)
+            dir = os.path.dirname(session)
+            if dir:
+                os.makedirs(dir, exist_ok=True)
             self.db = sqlite3.connect(session)
         else:
             self.db = None 
@@ -110,20 +106,36 @@ class StockBase:
         if self.db:
             self.db.close()
 
-    def _get_valuation(self, ticker, exchange, statistics, update=False):
+    def _check_database(self, unique_id):
+        '''
+        Check database if table with unique_id exists, and return it as a DataFrame
 
-        # Compose an unique ID for database table and file name
-        unique_id = f"{ticker}_{exchange}_{statistics}".replace(' ', '_').lower()
-        
-        if not update and self.db:
-            # Not force to update, check database first
+        Args:
+            unique_id: Name of the query table
+
+        Returns:
+            DataFrame of the table, or None
+        '''
+        if self.db:
             try:
                 query = f"SELECT * FROM {unique_id}"
                 df = pd.read_sql_query(query, self.db)
                 return df
             except pd.errors.DatabaseError as e:
-                print(f"{unique_id} is not found in database, pull it from the website")
-                pass
+                return None
+        else:
+            return None
+
+    def _get_valuation(self, ticker, exchange, statistics, update=False):
+
+        # Compose an unique ID for database table and file name
+        unique_id = f"{ticker}_{exchange}_{statistics}".replace(' ', '_').lower()
+
+        # Not force to update, check database first 
+        if not update:
+            df = self._check_database(unique_id)
+            if df is not None:
+                return df
         
         # Fetch data from website starts here
         url = f"https://www.morningstar.com/stocks/{exchange}/{ticker}/valuation"
@@ -141,7 +153,7 @@ class StockBase:
         # Wait download is done
         tmp_string = statistics_filename[statistics]
         tmp_file = self.download_dir + f"/{tmp_string}.xls"
-        while not os.path.exists(tmp_file):
+        while (not os.path.exists(tmp_file) or os.path.getsize(tmp_file) == 0):
             time.sleep(1)
 
         statistics_file = self.download_dir + f"/{unique_id}.xls"
@@ -158,15 +170,11 @@ class StockBase:
         # Compose an unique ID for database table and file name
         unique_id = f"{ticker}_{exchange}_{statement}_{period}_{stage}".replace(' ', '_').lower()
         
-        if not update and self.db:
-            # Not force to update, check database first
-            try:
-                query = f"SELECT * FROM {unique_id}"
-                df = pd.read_sql_query(query, self.db)
+        # Not force to update, check database first 
+        if not update:
+            df = self._check_database(unique_id)
+            if df is not None:
                 return df
-            except pd.errors.DatabaseError as e:
-                print(f"{unique_id} is not found in database, pull it from the website")
-                pass
 
         # Fetch data from website starts here
         url = f"https://www.morningstar.com/stocks/{exchange}/{ticker}/financials"
@@ -222,6 +230,34 @@ class StockBase:
             df.to_sql(unique_id, self.db, if_exists='replace', index=False)
 
         return df
+
+    def _get_us_exchange_tickers(self, exchange, update=False):
+
+        unique_id = f"us_exchange_{exchange}_tickers"
+
+        # Not force to update, check database first 
+        if not update:
+            df = self._check_database(unique_id)
+            if df is not None:
+                symbols = df['symbol'].tolist()
+                return symbols
+        
+        # The api.nasdaq.com needs a request with headers, or it won't response
+        headers = {
+            'accept': 'application/json, text/plain, */*',
+            'user-agent': 'Mozilla/5.0 (X11; Linux x86_64) Chrome/116.0.0.0 Safari/537.36 Edg/116.0.1938.76',
+        }
+        url=f'https://api.nasdaq.com/api/screener/stocks?tableonly=true&exchange={exchange}&download=true'
+        response = requests.get(url, headers=headers)
+
+        tmp_data = json.loads(response.text)
+        df = pd.DataFrame(tmp_data['data']['rows'])
+
+        if self.db:
+            df.to_sql(unique_id, self.db, if_exists='replace', index=False)
+
+        symbols = df['symbol'].tolist()
+        return symbols
 
 # End of class StockBase
 
@@ -377,5 +413,41 @@ class Stock(StockBase):
         tables = pd.read_html(response.text)
         symbols = tables[0]['Symbol'].tolist()
         return symbols
+    
+
+    def get_xnas_tickers(self):
+        '''
+        Get tickers of NASDAQ
+
+        Returns:
+            List of ticker names in NASDAQ
+        '''
+        
+        exchange = 'NASDAQ'
+        return self._get_us_exchange_tickers(exchange)
+
+    def get_xnys_tickers(self):
+        '''
+        Get tickers of NYSE
+
+        Returns:
+            List of ticker names in NYSE
+        '''
+        
+        exchange = 'NYSE'
+        return self._get_us_exchange_tickers(exchange)
+
+    def get_xase_tickers(self):
+        '''
+        Get tickers of NYSE
+
+        Returns:
+            List of ticker names in NYSE
+        '''
+        
+        exchange = 'AMEX'
+        return self._get_us_exchange_tickers(exchange)
+
+
 
 # End of class Stock

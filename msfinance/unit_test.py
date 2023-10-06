@@ -7,9 +7,10 @@ import sys
 import stocks
 import pandas as pd
 import requests
+import json
+
 
 proxy = 'socks5://127.0.0.1:1088'
-print(re.split(r'://|:', proxy))
 
 stock = stocks.Stock(
     debug=True, 
@@ -17,24 +18,21 @@ stock = stocks.Stock(
     proxy=proxy,
 )
 
-#stock.get_income_statement('aapl', 'xnas')
-#stock.get_balance_sheet_statement('aapl', 'xnas')
-#stock.get_cash_flow_statement('aapl', 'xnas')
-#
-#stock.get_growth('aapl', 'xnas')
-#stock.get_operating_and_efficiency('aapl', 'xnas')
-#stock.get_financial_health('aapl', 'xnas')
-print(stock.get_cash_flow('aapl', 'xnas'))
+
+tickers_list = {}
+tickers_list['xnas'] = stock.get_xnas_tickers()
+tickers_list['xnys'] = stock.get_xnys_tickers()
+tickers_list['xase'] = stock.get_xase_tickers()
 
 sp500_tickers = stock.get_sp500_tickers()
 
+# Test method in class Stock
+stock.get_income_statement('aapl', 'xnas')
+stock.get_balance_sheet_statement('aapl', 'xnas')
+stock.get_cash_flow_statement('aapl', 'xnas')
 
-## You can print the list of S&P 500 stock symbols
-print(sp500_tickers)
-
-for ticker in sp500_tickers:
-    pass
-
-
-
+stock.get_growth('aapl', 'xnas')
+stock.get_operating_and_efficiency('aapl', 'xnas')
+stock.get_financial_health('aapl', 'xnas')
+stock.get_cash_flow('aapl', 'xnas')
 
