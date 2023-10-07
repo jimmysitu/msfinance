@@ -8,12 +8,19 @@ import sqlite3
 import requests
 import pandas as pd
 
+from datetime import datetime
+
 from selenium import webdriver
 from selenium.webdriver.common.keys import Keys
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.common.proxy import Proxy, ProxyType
+
+from selenium.common.exceptions import NoSuchElementException
+from selenium.common.exceptions import TimeoutException
+
+
 # For Chrome driver
 from webdriver_manager.chrome import ChromeDriverManager
 
@@ -126,6 +133,24 @@ class StockBase:
         else:
             return None
 
+    def _upgate_database(self, unique_id, df):
+        '''
+        Update database with unique_id as table name, using DataFrame format data.
+        Add 'Last Updated' column to each record
+
+        Args:
+            unique_id: Name of the table
+
+        Returns:
+            True if update is done, else False 
+        '''
+        if self.db:
+            df['Last Updated'] = datetime.now()
+            df.to_sql(unique_id, self.db, if_exists='replace', index=False)
+            return True
+        else:
+            return False
+    
     def _get_valuation(self, ticker, exchange, statistics, update=False):
 
         # Compose an unique ID for database table and file name
@@ -147,8 +172,18 @@ class StockBase:
         export_button = WebDriverWait(self.driver, 30).until(
             EC.visibility_of_element_located((By.XPATH, "//button[contains(., 'Export Data')]"))
         )
-        export_button.click()
-        
+
+        # Check if there is no such data available
+        try:
+            # FIXME: Try a faster way to figure out data available instead of this
+            WebDriverWait(self.driver, 5).until(
+                EC.visibility_of_element_located(
+                    (By.XPATH, f"//div[contains(., 'There is no {statistics} data available.')]")
+                )
+            )
+            return None  
+        except TimeoutException:
+            export_button.click()
 
         # Wait download is done
         tmp_string = statistics_filename[statistics]
@@ -159,9 +194,10 @@ class StockBase:
         statistics_file = self.download_dir + f"/{unique_id}.xls"
         os.rename(tmp_file, statistics_file)
 
+        # Update database 
         if self.db:
             df = pd.read_excel(statistics_file)
-            df.to_sql(unique_id, self.db, if_exists='replace', index=False)
+            self._upgate_database(unique_id, df)
 
         return df
 
@@ -225,9 +261,10 @@ class StockBase:
         statement_file = self.download_dir + f"/{unique_id}.xls"
         os.rename(tmp_file, statement_file)
     
+        # Update datebase
         if self.db:
             df = pd.read_excel(statement_file)
-            df.to_sql(unique_id, self.db, if_exists='replace', index=False)
+            self._upgate_database(unique_id, df)
 
         return df
 
@@ -253,8 +290,9 @@ class StockBase:
         tmp_data = json.loads(response.text)
         df = pd.DataFrame(tmp_data['data']['rows'])
 
+        # Update datebase
         if self.db:
-            df.to_sql(unique_id, self.db, if_exists='replace', index=False)
+            self._upgate_database(unique_id, df)
 
         symbols = df['symbol'].tolist()
         return symbols

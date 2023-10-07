@@ -1,5 +1,5 @@
 # msfinance
-msfinance offers  Pythonic way to download stocks financial data from [morningstar.com/stocks](https://www.morningstar.com/stocks)
+msfinance offers Pythonic way to download stocks financial data from [morningstar.com/stocks](https://www.morningstar.com/stocks)
 
 
 ## US Tickers and Exchanges
@@ -11,7 +11,10 @@ msfinance offers  Pythonic way to download stocks financial data from [morningst
 
 
 ## TODO
-- [  ] Add 'last updated' to database record
-- [  ] Add tickers from HK exchanges
-- [  ] Add docs in docs directory for readthedoc.io
-- [  ] Add setup.py for pip package
+- [x] Add 'Last Updated' to database record
+- [ ] Add docs in docs directory for readthedoc.io
+- [ ] Add setup.py for pip package
+- [ ] Add multiprocessing for speed up
+- [ ] More robust error handling
+- [ ] Add tickers from HK exchanges
+- [ ] Add more statistics valuations
