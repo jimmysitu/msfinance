@@ -1,10 +1,10 @@
 #!/usr/bin/python3 -u
 
+from msfinance import stocks
 import os
 import time
 import re
 import sys
-import stocks
 import pandas as pd
 import requests
 import json
@@ -13,7 +13,7 @@ import json
 proxy = 'socks5://127.0.0.1:1088'
 
 stock = stocks.Stock(
-    debug=True, 
+    debug=True,
     session='/tmp/msfinance/msf.sql3',
     proxy=proxy,
 )
