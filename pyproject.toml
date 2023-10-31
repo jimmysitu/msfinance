@@ -17,7 +17,6 @@ classifiers = [
 requires-python = ">=3.8"
 license = {file = "LICENSE"}
 dependencies = [
-    "sqlite3",
     "requests",
     "pandas",
     "selenium",
