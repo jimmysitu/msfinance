@@ -1,0 +1,29 @@
+[build-system]
+requires = ["setuptools", "wheel"]
+
+[project]
+name = "msfinance"
+version = "0.1.0"
+authors = [
+    { name = "Jimmy Situ", email = "web@jimmystone.com"}
+]
+description = "msfinance offers Pythonic way to download stocks financial data from morningstar.com"
+readme = "README.md"
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "License :: OSI Approved :: Apache Software License",
+    "Operating System :: OS Independent"
+]
+requires-python = ">=3.8"
+license = {file = "LICENSE"}
+dependencies = [
+    "sqlite3",
+    "requests",
+    "pandas",
+    "selenium",
+    "webdriver_manager"
+]
+
+[project.urls]
+"Homepage" = "https://github.com/jimmysitu/msfinance"
+"Bug Tracker" = "https://github.com/jimmysitu/msfinance/issues"

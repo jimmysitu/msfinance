@@ -1,0 +1,6 @@
+sqlite3
+requests
+pandas
+selenium
+webdriver_manager
+
