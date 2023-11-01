@@ -108,7 +108,7 @@ class StockBase:
 
     def __del__(self):
         if not self.debug:
-            self.driver.close()
+            self.driver.quit()
 
         # Close database
         if self.db:
