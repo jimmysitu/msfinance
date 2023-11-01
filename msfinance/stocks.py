@@ -18,6 +18,7 @@ from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.common.proxy import Proxy, ProxyType
 
 from selenium.common.exceptions import NoSuchElementException
+from selenium.common.exceptions import ElementClickInterceptedException
 from selenium.common.exceptions import TimeoutException
 
 
@@ -201,7 +202,7 @@ class StockBase:
 
         return df
 
-    def _get_financials(self, ticker, exchange, statement, period='Annual', stage='Restated', update=False):
+    def _get_financials(self, ticker, exchange, statement, period='Annual', stage='As Originally Reported', update=False):
         
         # Compose an unique ID for database table and file name
         unique_id = f"{ticker}_{exchange}_{statement}_{period}_{stage}".replace(' ', '_').lower()
@@ -228,19 +229,32 @@ class StockBase:
             period_button = self.driver.find_element(By.XPATH, "//span[contains(., 'Annual') and @class='mds-list-group__item-text__sal']")
         else:
             period_button = self.driver.find_element(By.XPATH, "//span[contains(., 'Quarterly') and @class='mds-list-group__item-text__sal']")
-
-        period_button.click()
+        
+        # FIXME: May not work since 2023-11-01
+        try:
+            period_button.click()
+        except ElementClickInterceptedException:
+            pass
 
         # Select statement type
         type_list_button = self.driver.find_element(By.XPATH, "//button[contains(., 'As Originally Reported') and @aria-haspopup='true']")
-        type_list_button.click()
+        
+        # FIXME: May not work since 2023-11-01
+        try: 
+            type_list_button.click()
+        except ElementClickInterceptedException:
+            pass
 
-        if 'Restated' == stage:
-            type_button = self.driver.find_element(By.XPATH, "//span[contains(., 'Restated') and @class='mds-list-group__item-text__sal']")
-        else:
+        if 'As Originally Reported' == stage:
             type_button = self.driver.find_element(By.XPATH, "//span[contains(., 'As Originally Reported') and @class='mds-list-group__item-text__sal']")
+        else:
+            type_button = self.driver.find_element(By.XPATH, "//span[contains(., 'Restated') and @class='mds-list-group__item-text__sal']")
 
-        type_button.click()
+        # FIXME: May not work since 2023-11-01
+        try: 
+            type_button.click()
+        except ElementClickInterceptedException:
+            pass
 
         # Expand the detail page
         expand_detail_view = WebDriverWait(self.driver, 30).until(
@@ -374,7 +388,7 @@ class Stock(StockBase):
         
         return self.valuations
 
-    def get_income_statement(self, ticker, exchange, period='Annual', stage='Restated'):
+    def get_income_statement(self, ticker, exchange, period='Annual', stage='As Originally Reported'):
         '''
         Get income statement of stock
         
@@ -389,45 +403,45 @@ class Stock(StockBase):
         statement = 'Income Statement'
         return self._get_financials(ticker, exchange, statement, period, stage)
 
-    def get_balance_sheet_statement(self, ticker, exchange, period='Annual', stage='Restated'):
+    def get_balance_sheet_statement(self, ticker, exchange, period='Annual', stage='As Originally Reported'):
         '''
         Get balance sheet statement of stock
         
         Args:
             ticker: Stock symbol
             exchange: Exchange name
-            period: Period of statement, which can be Annual, Quarterly
-            stage: Stage of statement, which can be 'As Originally Reported', 'Restated'
+            period: Period of statement, which can be 'Annual'(default), 'Quarterly'
+            stage: Stage of statement, which can be 'As Originally Reported'(default), 'Restated'
         Returns:
             DataFrame of balance sheet statement
         '''
         statement = 'Balance Sheet'
         return self._get_financials(ticker, exchange, statement, period, stage)
 
-    def get_cash_flow_statement(self, ticker, exchange, period='Annual', stage='Restated'):
+    def get_cash_flow_statement(self, ticker, exchange, period='Annual', stage='As Originally Reported'):
         '''
         Get cash flow statement of stock
         
         Args:
             ticker: Stock symbol
             exchange: Exchange name
-            period: Period of statement, which can be Annual, Quarterly
-            stage: Stage of statement, which can be 'As Originally Reported', 'Restated'
+            period: Period of statement, which can be 'Annual'(default), 'Quarterly'
+            stage: Stage of statement, which can be 'As Originally Reported'(default), 'Restated'
         Returns:
             DataFrame of cash flow statement
         '''
         statement = 'Cash Flow'
         return self._get_financials(ticker, exchange, statement, period, stage)
 
-    def get_financials(self, ticker, exchange, period='Annual', stage='Restated'):
+    def get_financials(self, ticker, exchange, period='Annual', stage='As Originally Reported'):
         '''
         Get all financials statements of stock
         
         Args:
             ticker: Stock symbol
             exchange: Exchange name
-            period: Period of statement, which can be Annual, Quarterly
-            stage: Stage of statement, which can be 'As Originally Reported', 'Restated'
+            period: Period of statement, which can be 'Annual'(default), 'Quarterly'
+            stage: Stage of statement, which can be 'As Originally Reported'(default), 'Restated'
         Returns:
             DataFrame list of financials statements
         '''
@@ -477,10 +491,10 @@ class Stock(StockBase):
 
     def get_xase_tickers(self):
         '''
-        Get tickers of NYSE
+        Get tickers of AMEX
 
         Returns:
-            List of ticker names in NYSE
+            List of ticker names in AMEX
         '''
         
         exchange = 'AMEX'
