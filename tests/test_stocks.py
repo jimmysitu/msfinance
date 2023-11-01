@@ -12,11 +12,19 @@ import json
 def test_stocks():
     proxy = 'socks5://127.0.0.1:1088'
 
-    stock = stocks.Stock(
-        debug=False,
-        session='/tmp/msfinance/msf.sql3',
-        proxy=None,
-    )
+    if 'true' == os.getenv('GITHUB_ACTIONS'):
+        stock = stocks.Stock(
+            debug=False,
+            session='/tmp/msfinance/msf.sql3',
+            proxy=None,
+        )
+    else:
+        stock = stocks.Stock(
+            debug=False,
+            session='/tmp/msfinance/msf.sql3',
+            proxy=proxy,
+        )
+
 
 
     tickers_list = {}
