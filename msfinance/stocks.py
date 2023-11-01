@@ -196,8 +196,8 @@ class StockBase:
         os.rename(tmp_file, statistics_file)
 
         # Update database 
+        df = pd.read_excel(statistics_file)
         if self.db:
-            df = pd.read_excel(statistics_file)
             self._upgate_database(unique_id, df)
 
         return df
@@ -276,8 +276,8 @@ class StockBase:
         os.rename(tmp_file, statement_file)
     
         # Update datebase
+        df = pd.read_excel(statement_file)
         if self.db:
-            df = pd.read_excel(statement_file)
             self._upgate_database(unique_id, df)
 
         return df
