@@ -13,7 +13,7 @@ import json
 proxy = 'socks5://127.0.0.1:1088'
 
 stock = stocks.Stock(
-    debug=True,
+    debug=False,
     session='/tmp/msfinance/msf.sql3',
     proxy=None,
 )
