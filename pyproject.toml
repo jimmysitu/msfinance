@@ -17,6 +17,7 @@ classifiers = [
 requires-python = ">=3.8"
 license = {file = "LICENSE"}
 dependencies = [
+    "lxml",
     "requests",
     "pandas",
     "selenium",
