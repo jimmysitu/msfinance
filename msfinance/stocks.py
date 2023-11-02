@@ -475,7 +475,7 @@ class Stock(StockBase):
             List of ticker names in NASDAQ
         '''
         
-        exchange = 'NASDAQ'
+        exchange = 'nasdaq'
         return self._get_us_exchange_tickers(exchange)
 
     def get_xnys_tickers(self):
@@ -486,7 +486,7 @@ class Stock(StockBase):
             List of ticker names in NYSE
         '''
         
-        exchange = 'NYSE'
+        exchange = 'nyse'
         return self._get_us_exchange_tickers(exchange)
 
     def get_xase_tickers(self):
@@ -497,7 +497,7 @@ class Stock(StockBase):
             List of ticker names in AMEX
         '''
         
-        exchange = 'AMEX'
+        exchange = 'amex'
         return self._get_us_exchange_tickers(exchange)
 
 

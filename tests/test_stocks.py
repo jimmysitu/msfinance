@@ -1,5 +1,6 @@
 #!/usr/bin/python3 -u
 
+import sqlite3
 from msfinance import stocks
 import os
 import time
@@ -11,17 +12,19 @@ import json
 
 def test_stocks():
     proxy = 'socks5://127.0.0.1:1088'
+    session='/tmp/msfinance/msf.sql3'
+
 
     if 'true' == os.getenv('GITHUB_ACTIONS'):
         stock = stocks.Stock(
             debug=False,
-            session='/tmp/msfinance/msf.sql3',
+            session=session,
             proxy=None,
         )
     else:
         stock = stocks.Stock(
             debug=False,
-            session='/tmp/msfinance/msf.sql3',
+            session=session,
             proxy=proxy,
         )
 
@@ -45,3 +48,21 @@ def test_stocks():
     stock.get_cash_flow('aapl', 'xnas')
 
 
+    db = sqlite3.connect(session)
+
+    for exchange in ['nasdaq', 'nyse', 'amex']:
+        query = f"SELECT * FROM us_exchange_{exchange}_tickers"
+        df = pd.read_sql_query(query, db)
+        assert df is not None, f"{query} is not found in database"
+
+    assert 'AAPL' in sp500_tickers
+
+    for statement in ['income_statement', 'balance_sheet', 'cash_flow']:
+        query = f"SELECT * FROM aapl_xnas_{statement}_annual_as_originally_reported"
+        df = pd.read_sql_query(query, db)
+        assert df is not None, f"{query} is not found in database"
+    
+    for statistics in ['growth', 'operating_and_efficiency', 'financial_health','cash_flow']:
+        query = f"SELECT * FROM aapl_xnas_{statistics}"
+        df = pd.read_sql_query(query, db)
+        assert df is not None, f"{query} is not found in database"
