@@ -194,6 +194,7 @@ class StockBase:
 
         statistics_file = self.download_dir + f"/{unique_id}.xls"
         os.rename(tmp_file, statistics_file)
+        time.sleep(1)
 
         # Update database 
         df = pd.read_excel(statistics_file)
@@ -223,7 +224,11 @@ class StockBase:
 
         # Select statement period
         period_list_button = self.driver.find_element(By.XPATH, "//button[contains(., 'Annual') and @aria-haspopup='true']")
-        period_list_button.click()
+        try:
+            period_list_button.click()
+            time.sleep(1)
+        except ElementClickInterceptedException:
+            pass
 
         if 'Annual' == period:
             period_button = self.driver.find_element(By.XPATH, "//span[contains(., 'Annual') and @class='mds-list-group__item-text__sal']")
@@ -232,14 +237,15 @@ class StockBase:
         
         try:
             period_button.click()
+            time.sleep(1)
         except ElementClickInterceptedException:
             pass
 
         # Select statement type
         type_list_button = self.driver.find_element(By.XPATH, "//button[contains(., 'As Originally Reported') and @aria-haspopup='true']")
-        
         try: 
             type_list_button.click()
+            time.sleep(1)
         except ElementClickInterceptedException:
             pass
 
@@ -250,6 +256,7 @@ class StockBase:
 
         try: 
             type_button.click()
+            time.sleep(1)
         except ElementClickInterceptedException:
             pass
 
@@ -271,6 +278,7 @@ class StockBase:
 
         statement_file = self.download_dir + f"/{unique_id}.xls"
         os.rename(tmp_file, statement_file)
+        time.sleep(1)
     
         # Update datebase
         df = pd.read_excel(statement_file)
