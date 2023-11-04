@@ -1,11 +1,6 @@
 #!/usr/bin/python3 -u
 
-import pandas as pd
-import os
-
 import msfinance as msf
-
-
 
 proxy = 'socks5://127.0.0.1:1088'
 

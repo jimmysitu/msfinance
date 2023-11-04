@@ -40,6 +40,7 @@ class StockBase:
     def __init__(self, debug=False, browser='firefox', session='/tmp/msfinance/msfinance.db', proxy=None):
         self.debug = debug
         if('chrome' == browser):
+            # TODO: Add chrome support
             pass
         else:
             # Default: firefox
@@ -134,7 +135,7 @@ class StockBase:
         else:
             return None
 
-    def _upgate_database(self, unique_id, df):
+    def _update_database(self, unique_id, df):
         '''
         Update database with unique_id as table name, using DataFrame format data.
         Add 'Last Updated' column to each record
@@ -198,7 +199,7 @@ class StockBase:
         # Update database 
         df = pd.read_excel(statistics_file)
         if self.db:
-            self._upgate_database(unique_id, df)
+            self._update_database(unique_id, df)
 
         return df
 
@@ -278,7 +279,7 @@ class StockBase:
         # Update datebase
         df = pd.read_excel(statement_file)
         if self.db:
-            self._upgate_database(unique_id, df)
+            self._update_database(unique_id, df)
 
         return df
 
@@ -306,7 +307,7 @@ class StockBase:
 
         # Update datebase
         if self.db:
-            self._upgate_database(unique_id, df)
+            self._update_database(unique_id, df)
 
         symbols = df['symbol'].tolist()
         return symbols
