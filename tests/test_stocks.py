@@ -58,7 +58,7 @@ def test_stocks():
     assert 'AAPL' in sp500_tickers
 
     for statement in ['income_statement', 'balance_sheet', 'cash_flow']:
-        query = f"SELECT * FROM aapl_xnas_{statement}_annual_as_originally_reported"
+        query = f"SELECT * FROM aapl_xnas_{statement}_annual_restated"
         df = pd.read_sql_query(query, db)
         assert df is not None, f"{query} is not found in database"
     

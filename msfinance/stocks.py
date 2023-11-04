@@ -1,6 +1,5 @@
 
 import os
-import shutil
 import re
 import time
 import json
@@ -203,7 +202,7 @@ class StockBase:
 
         return df
 
-    def _get_financials(self, ticker, exchange, statement, period='Annual', stage='As Originally Reported', update=False):
+    def _get_financials(self, ticker, exchange, statement, period='Annual', stage='Restated', update=False):
         
         # Compose an unique ID for database table and file name
         unique_id = f"{ticker}_{exchange}_{statement}_{period}_{stage}".replace(' ', '_').lower()
@@ -231,7 +230,6 @@ class StockBase:
         else:
             period_button = self.driver.find_element(By.XPATH, "//span[contains(., 'Quarterly') and @class='mds-list-group__item-text__sal']")
         
-        # FIXME: May not work since 2023-11-01
         try:
             period_button.click()
         except ElementClickInterceptedException:
@@ -240,7 +238,6 @@ class StockBase:
         # Select statement type
         type_list_button = self.driver.find_element(By.XPATH, "//button[contains(., 'As Originally Reported') and @aria-haspopup='true']")
         
-        # FIXME: May not work since 2023-11-01
         try: 
             type_list_button.click()
         except ElementClickInterceptedException:
@@ -251,7 +248,6 @@ class StockBase:
         else:
             type_button = self.driver.find_element(By.XPATH, "//span[contains(., 'Restated') and @class='mds-list-group__item-text__sal']")
 
-        # FIXME: May not work since 2023-11-01
         try: 
             type_button.click()
         except ElementClickInterceptedException:
@@ -389,7 +385,7 @@ class Stock(StockBase):
         
         return self.valuations
 
-    def get_income_statement(self, ticker, exchange, period='Annual', stage='As Originally Reported'):
+    def get_income_statement(self, ticker, exchange, period='Annual', stage='Restated'):
         '''
         Get income statement of stock
         
@@ -397,14 +393,14 @@ class Stock(StockBase):
             ticker: Stock symbol
             exchange: Exchange name
             period: Period of statement, which can be Annual, Quarterly
-            stage: Stage of statement, which can be 'As Originally Reported', 'Restated'
+            stage: Stage of statement, which can be 'As Originally Reported', 'Restated'(default)
         Returns:
             DataFrame of income statement
         '''
         statement = 'Income Statement'
         return self._get_financials(ticker, exchange, statement, period, stage)
 
-    def get_balance_sheet_statement(self, ticker, exchange, period='Annual', stage='As Originally Reported'):
+    def get_balance_sheet_statement(self, ticker, exchange, period='Annual', stage='Restated'):
         '''
         Get balance sheet statement of stock
         
@@ -412,14 +408,14 @@ class Stock(StockBase):
             ticker: Stock symbol
             exchange: Exchange name
             period: Period of statement, which can be 'Annual'(default), 'Quarterly'
-            stage: Stage of statement, which can be 'As Originally Reported'(default), 'Restated'
+            stage: Stage of statement, which can be 'As Originally Reported', 'Restated'(default)
         Returns:
             DataFrame of balance sheet statement
         '''
         statement = 'Balance Sheet'
         return self._get_financials(ticker, exchange, statement, period, stage)
 
-    def get_cash_flow_statement(self, ticker, exchange, period='Annual', stage='As Originally Reported'):
+    def get_cash_flow_statement(self, ticker, exchange, period='Annual', stage='Restated'):
         '''
         Get cash flow statement of stock
         
@@ -427,14 +423,14 @@ class Stock(StockBase):
             ticker: Stock symbol
             exchange: Exchange name
             period: Period of statement, which can be 'Annual'(default), 'Quarterly'
-            stage: Stage of statement, which can be 'As Originally Reported'(default), 'Restated'
+            stage: Stage of statement, which can be 'As Originally Reported', 'Restated'(default)
         Returns:
             DataFrame of cash flow statement
         '''
         statement = 'Cash Flow'
         return self._get_financials(ticker, exchange, statement, period, stage)
 
-    def get_financials(self, ticker, exchange, period='Annual', stage='As Originally Reported'):
+    def get_financials(self, ticker, exchange, period='Annual', stage='Restated'):
         '''
         Get all financials statements of stock
         
@@ -442,7 +438,7 @@ class Stock(StockBase):
             ticker: Stock symbol
             exchange: Exchange name
             period: Period of statement, which can be 'Annual'(default), 'Quarterly'
-            stage: Stage of statement, which can be 'As Originally Reported'(default), 'Restated'
+            stage: Stage of statement, which can be 'As Originally Reported', 'Restated'(default)
         Returns:
             DataFrame list of financials statements
         '''

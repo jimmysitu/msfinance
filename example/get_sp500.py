@@ -20,14 +20,18 @@ tickers_list['xase'] = stock.get_xase_tickers()
 for ticker in sorted(sp500_tickers):
     if ticker in tickers_list['xnas']:
         valuations = stock.get_valuations(ticker, 'xnas')
+        financials = stock.get_financials(ticker, 'xnas')
     elif ticker in tickers_list['xnys']:
         valuations = stock.get_valuations(ticker, 'xnys')
+        financials = stock.get_financials(ticker, 'xnys')
     elif ticker in tickers_list['xase']:
-        valuations = stock.get_valuations(ticker, 'xnys')
+        valuations = stock.get_valuations(ticker, 'xase')
+        financials = stock.get_financials(ticker, 'xase')
     else:
         print(f"Ticker: {ticker} is not found in any exchange")
 
+    print(f"Ticker: {ticker}")
     for valuation in valuations:
-        print(f"Ticker: {ticker}")
         print(valuation)
-
+    for financial in financials:
+        print(financial)
