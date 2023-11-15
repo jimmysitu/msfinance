@@ -1,3 +1,4 @@
+retry
 xlrd
 lxml
 requests
