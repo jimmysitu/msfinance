@@ -38,9 +38,10 @@ def test_stocks():
     sp500_tickers = stock.get_sp500_tickers()
 
     # Test method in class Stock
-    stock.get_income_statement('aapl', 'xnas', stage='As Originally Reported')
-    stock.get_balance_sheet_statement('aapl', 'xnas', stage='As Originally Reported')
-    stock.get_cash_flow_statement('aapl', 'xnas', stage='As Originally Reported')
+    stage = 'As Originally Reported'
+    stock.get_income_statement('aapl', 'xnas', stage=stage)
+    stock.get_balance_sheet_statement('aapl', 'xnas', stage=stage)
+    stock.get_cash_flow_statement('aapl', 'xnas', stage=stage)
 
     stock.get_growth('aapl', 'xnas')
     stock.get_operating_and_efficiency('aapl', 'xnas')
@@ -57,8 +58,9 @@ def test_stocks():
 
     assert 'AAPL' in sp500_tickers
 
+    stage = 'As Originally Reported'.replace(' ', '_').lower()
     for statement in ['income_statement', 'balance_sheet', 'cash_flow']:
-        query = f"SELECT * FROM aapl_xnas_{statement}_annual_restated"
+        query = f"SELECT * FROM aapl_xnas_{statement}_annual_{stage}"
         df = pd.read_sql_query(query, db)
         assert df is not None, f"{query} is not found in database"
 
