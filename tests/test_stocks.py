@@ -38,9 +38,9 @@ def test_stocks():
     sp500_tickers = stock.get_sp500_tickers()
 
     # Test method in class Stock
-    stock.get_income_statement('aapl', 'xnas')
-    stock.get_balance_sheet_statement('aapl', 'xnas')
-    stock.get_cash_flow_statement('aapl', 'xnas')
+    stock.get_income_statement('aapl', 'xnas', stage='As Originally Reported')
+    stock.get_balance_sheet_statement('aapl', 'xnas', stage='As Originally Reported')
+    stock.get_cash_flow_statement('aapl', 'xnas', stage='As Originally Reported')
 
     stock.get_growth('aapl', 'xnas')
     stock.get_operating_and_efficiency('aapl', 'xnas')
@@ -61,7 +61,7 @@ def test_stocks():
         query = f"SELECT * FROM aapl_xnas_{statement}_annual_restated"
         df = pd.read_sql_query(query, db)
         assert df is not None, f"{query} is not found in database"
-    
+
     for statistics in ['growth', 'operating_and_efficiency', 'financial_health','cash_flow']:
         query = f"SELECT * FROM aapl_xnas_{statistics}"
         df = pd.read_sql_query(query, db)
