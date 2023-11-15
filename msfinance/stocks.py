@@ -5,8 +5,10 @@ import time
 import json
 import sqlite3
 import requests
+
 import pandas as pd
 
+from retrying import retry
 from datetime import datetime
 
 from selenium import webdriver
@@ -151,7 +153,8 @@ class StockBase:
             return True
         else:
             return False
-    
+
+    @retry(wait_fixed=2000, stop_max_attempt_number=3)
     def _get_valuation(self, ticker, exchange, statistics, update=False):
 
         # Compose an unique ID for database table and file name
@@ -189,8 +192,14 @@ class StockBase:
         # Wait download is done
         tmp_string = statistics_filename[statistics]
         tmp_file = self.download_dir + f"/{tmp_string}.xls"
-        while (not os.path.exists(tmp_file) or os.path.getsize(tmp_file) == 0):
+        
+        retries = 5
+        while retries and (not os.path.exists(tmp_file) or os.path.getsize(tmp_file) == 0):
             time.sleep(1)
+            retries = retries - 1 
+        
+        if 0 == retries and (not os.path.exists(tmp_file)):
+            raise ValueError("Export data fail")
 
         statistics_file = self.download_dir + f"/{unique_id}.xls"
         os.rename(tmp_file, statistics_file)
@@ -203,6 +212,7 @@ class StockBase:
 
         return df
 
+    @retry(wait_fixed=2000, stop_max_attempt_number=3)
     def _get_financials(self, ticker, exchange, statement, period='Annual', stage='Restated', update=False):
         
         # Compose an unique ID for database table and file name
@@ -271,10 +281,15 @@ class StockBase:
         )
         export_button.click()
 
+        retries = 5
         # Wait download is done
         tmp_file = self.download_dir + f"/{statement}_{period}_{stage}.xls"
-        while not os.path.exists(tmp_file):
+        while retries and (not os.path.exists(tmp_file)):
             time.sleep(1)
+            retries = retries - 1 
+        
+        if 0 == retries and (not os.path.exists(tmp_file)):
+            raise ValueError("Export data fail")
 
         statement_file = self.download_dir + f"/{unique_id}.xls"
         os.rename(tmp_file, statement_file)
@@ -400,7 +415,7 @@ class Stock(StockBase):
         Args:
             ticker: Stock symbol
             exchange: Exchange name
-            period: Period of statement, which can be Annual, Quarterly
+            period: Period of statement, which can be 'Annual'(default), 'Quarterly'
             stage: Stage of statement, which can be 'As Originally Reported', 'Restated'(default)
         Returns:
             DataFrame of income statement
@@ -438,7 +453,7 @@ class Stock(StockBase):
         statement = 'Cash Flow'
         return self._get_financials(ticker, exchange, statement, period, stage)
 
-    def get_financials(self, ticker, exchange, period='Annual', stage='Restated'):
+    def get_financials(self, ticker, exchange, period='Annual', stage='As Originally Reported'):
         '''
         Get all financials statements of stock
         
@@ -446,7 +461,7 @@ class Stock(StockBase):
             ticker: Stock symbol
             exchange: Exchange name
             period: Period of statement, which can be 'Annual'(default), 'Quarterly'
-            stage: Stage of statement, which can be 'As Originally Reported', 'Restated'(default)
+            stage: Stage of statement, which can be 'As Originally Reported'(default), 'Restated'
         Returns:
             DataFrame list of financials statements
         '''
