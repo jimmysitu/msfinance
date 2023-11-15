@@ -17,7 +17,7 @@ classifiers = [
 requires-python = ">=3.8"
 license = {file = "LICENSE"}
 dependencies = [
-    "retry",
+    "retrying",
     "xlrd",
     "lxml",
     "requests",
