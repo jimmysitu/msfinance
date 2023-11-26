@@ -20,6 +20,7 @@ from selenium.webdriver.common.proxy import Proxy, ProxyType
 
 from selenium.common.exceptions import NoSuchElementException
 from selenium.common.exceptions import ElementClickInterceptedException
+from selenium.common.exceptions import ElementNotInteractableException
 from selenium.common.exceptions import TimeoutException
 
 
@@ -228,9 +229,9 @@ class StockBase:
         url = f"https://www.morningstar.com/stocks/{exchange}/{ticker}/financials"
         self.driver.get(url)
 
-        # Select income statement
-        income_button = self.driver.find_element(By.XPATH, f"//button[contains(., '{statement}')]")
-        income_button.click()
+        # Select statement type
+        type_button = self.driver.find_element(By.XPATH, f"//button[contains(., '{statement}')]")
+        type_button.click()
 
         # Select statement period
         period_list_button = self.driver.find_element(By.XPATH, "//button[contains(., 'Annual') and @aria-haspopup='true']")
@@ -251,23 +252,27 @@ class StockBase:
         except ElementClickInterceptedException:
             pass
 
-        # Select statement type
-        type_list_button = self.driver.find_element(By.XPATH, "//button[contains(., 'As Originally Reported') and @aria-haspopup='true']")
+        # Select statement stage
+        stage_list_button = self.driver.find_element(By.XPATH, "//button[contains(., 'As Originally Reported') and @aria-haspopup='true']")
         try: 
-            type_list_button.click()
+            stage_list_button.click()
             time.sleep(1)
         except ElementClickInterceptedException:
             pass
+        except ElementNotInteractableException:
+            pass
 
         if 'As Originally Reported' == stage:
-            type_button = self.driver.find_element(By.XPATH, "//span[contains(., 'As Originally Reported') and @class='mds-list-group__item-text__sal']")
+            stage_button = self.driver.find_element(By.XPATH, "//span[contains(., 'As Originally Reported') and @class='mds-list-group__item-text__sal']")
         else:
-            type_button = self.driver.find_element(By.XPATH, "//span[contains(., 'Restated') and @class='mds-list-group__item-text__sal']")
+            stage_button = self.driver.find_element(By.XPATH, "//span[contains(., 'Restated') and @class='mds-list-group__item-text__sal']")
 
         try: 
-            type_button.click()
+            stage_button.click()
             time.sleep(1)
         except ElementClickInterceptedException:
+            pass
+        except ElementNotInteractableException:
             pass
 
         # Expand the detail page
