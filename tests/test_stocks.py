@@ -36,6 +36,10 @@ def test_stocks():
     tickers_list['xase'] = stock.get_xase_tickers()
 
     sp500_tickers = stock.get_sp500_tickers()
+    assert 'AAPL' in sp500_tickers
+    
+    hsi_tickers = stock.get_hsi_tickers()
+    assert '00700' in hsi_tickers
 
     # Test method in class Stock
     stage = 'As Originally Reported'
@@ -55,8 +59,6 @@ def test_stocks():
         query = f"SELECT * FROM us_exchange_{exchange}_tickers"
         df = pd.read_sql_query(query, db)
         assert df is not None, f"{query} is not found in database"
-
-    assert 'AAPL' in sp500_tickers
 
     stage = 'As Originally Reported'.replace(' ', '_').lower()
     for statement in ['income_statement', 'balance_sheet', 'cash_flow']:

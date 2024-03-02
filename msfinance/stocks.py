@@ -478,9 +478,25 @@ class Stock(StockBase):
 
         return self.financials
 
+    def get_hsi_tickers(self):
+        '''
+        Get ticker of Hang Seng Index
+
+        Returns:
+            List of ticker with 5-digital number string
+        ''' 
+        url = "https://en.wikipedia.org/wiki/Hang_Seng_Index"
+        response = requests.get(url, proxies=self.proxies)
+        tables = pd.read_html(response.text)
+        symbols = tables[6]['Ticker'].tolist()
+        pfx_len = len('SEHK:\xa0')
+        symbols = [s[pfx_len:].zfill(5) for s in symbols]
+        return symbols
+
+
     def get_sp500_tickers(self):
         '''
-        Get tickers of sp500
+        Get tickers of SP500
 
         Returns:
             List of ticker names
@@ -491,7 +507,7 @@ class Stock(StockBase):
         symbols = tables[0]['Symbol'].tolist()
         return symbols
     
-
+    
     def get_xnas_tickers(self):
         '''
         Get tickers of NASDAQ

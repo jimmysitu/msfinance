@@ -39,14 +39,14 @@ print(stock.get_cash_flow('aapl', 'xnas'))
 
 
 ## HK Tickers and Exchanges
-- TBD
+- Get all tickers numbers of Heng Seng Index [here](https://en.wikipedia.org/wiki/Hang_Seng_Index#Components)
 
 
 ## TODO
 - [x] Add 'Last Updated' to database record
-- [ ] Add docs in docs directory for readthedoc.io
 - [x] Add support for pip package
+- [x] Add tickers from HK exchanges
+- [ ] Add docs in docs directory for readthedoc.io
 - [ ] Add multiprocessing for speed up
 - [ ] More robust error handling
-- [ ] Add tickers from HK exchanges
 - [ ] Add more statistics valuations
