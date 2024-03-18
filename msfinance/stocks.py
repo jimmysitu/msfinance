@@ -354,9 +354,9 @@ class Stock(StockBase):
             DataFrame of statistics
         '''
         statistics = 'Growth'
-        return self._get_valuation(ticker, exchange, statistics)
+        return self._get_valuation(ticker, exchange, statistics, update)
     
-    def get_operating_and_efficiency(self, ticker, exchange):
+    def get_operating_and_efficiency(self, ticker, exchange, update=False):
         '''
         Get operating and efficiency statistics of stock
         
@@ -367,9 +367,9 @@ class Stock(StockBase):
             DataFrame of statistics
         '''
         statistics = 'Operating and Efficiency'
-        return self._get_valuation(ticker, exchange, statistics)
+        return self._get_valuation(ticker, exchange, statistics, update)
     
-    def get_financial_health(self, ticker, exchange):
+    def get_financial_health(self, ticker, exchange, update=False):
         '''
         Get financial health statistics of stock
         
@@ -380,9 +380,9 @@ class Stock(StockBase):
             DataFrame of statistics
         '''
         statistics = 'Financial Health'
-        return self._get_valuation(ticker, exchange, statistics)
+        return self._get_valuation(ticker, exchange, statistics, update)
     
-    def get_cash_flow(self, ticker, exchange):
+    def get_cash_flow(self, ticker, exchange, update=False):
         '''
         Get cash flow statistics of stock
         
@@ -393,9 +393,9 @@ class Stock(StockBase):
             DataFrame of statistics
         '''
         statistics = 'Cash Flow'
-        return self._get_valuation(ticker, exchange, statistics)
+        return self._get_valuation(ticker, exchange, statistics, update)
 
-    def get_valuations(self, ticker, exchange):
+    def get_valuations(self, ticker, exchange, update=False):
         '''
         Get all valuations of stock
         
@@ -408,12 +408,12 @@ class Stock(StockBase):
 
         self.valuations = []
         for statistics in ['Growth', 'Operating and Efficiency', 'Financial Health','Cash Flow']:
-            df = self._get_valuation(ticker, exchange, statistics)
+            df = self._get_valuation(ticker, exchange, statistics, update)
             self.valuations.append(df)
         
         return self.valuations
 
-    def get_income_statement(self, ticker, exchange, period='Annual', stage='Restated'):
+    def get_income_statement(self, ticker, exchange, period='Annual', stage='Restated', update=False):
         '''
         Get income statement of stock
         
@@ -426,9 +426,9 @@ class Stock(StockBase):
             DataFrame of income statement
         '''
         statement = 'Income Statement'
-        return self._get_financials(ticker, exchange, statement, period, stage)
+        return self._get_financials(ticker, exchange, statement, period, stage, update)
 
-    def get_balance_sheet_statement(self, ticker, exchange, period='Annual', stage='Restated'):
+    def get_balance_sheet_statement(self, ticker, exchange, period='Annual', stage='Restated', update=False):
         '''
         Get balance sheet statement of stock
         
@@ -441,9 +441,9 @@ class Stock(StockBase):
             DataFrame of balance sheet statement
         '''
         statement = 'Balance Sheet'
-        return self._get_financials(ticker, exchange, statement, period, stage)
+        return self._get_financials(ticker, exchange, statement, period, stage, update)
 
-    def get_cash_flow_statement(self, ticker, exchange, period='Annual', stage='Restated'):
+    def get_cash_flow_statement(self, ticker, exchange, period='Annual', stage='Restated', update=False):
         '''
         Get cash flow statement of stock
         
@@ -456,9 +456,9 @@ class Stock(StockBase):
             DataFrame of cash flow statement
         '''
         statement = 'Cash Flow'
-        return self._get_financials(ticker, exchange, statement, period, stage)
+        return self._get_financials(ticker, exchange, statement, period, stage, update)
 
-    def get_financials(self, ticker, exchange, period='Annual', stage='As Originally Reported'):
+    def get_financials(self, ticker, exchange, period='Annual', stage='As Originally Reported', update=False):
         '''
         Get all financials statements of stock
         
@@ -473,7 +473,7 @@ class Stock(StockBase):
 
         self.financials = []
         for statement in ['Income Statement', 'Balance Sheet', 'Cash Flow']:
-            df = self._get_financials(ticker, exchange, statement, period, stage)
+            df = self._get_financials(ticker, exchange, statement, period, stage, update)
             self.financials.append(df)
 
         return self.financials
