@@ -31,7 +31,7 @@ print(stock.get_operating_and_efficiency('aapl', 'xnas'))
 print(stock.get_financial_health('aapl', 'xnas'))
 print(stock.get_cash_flow('aapl', 'xnas'))
 ```
-- More example is placed in [example](https://github.com/jimmysitu/msfinance/tree/main/example) directory. Add msfinance path to environment variable: PYTHONPATH
+- More example is placed in [example](https://github.com/jimmysitu/msfinance/tree/main/example) directory. Add msfinance path to environment variable: PYTHONPATH, and run examples directly 
 
 
 ## US Tickers and Exchanges
@@ -45,7 +45,7 @@ print(stock.get_cash_flow('aapl', 'xnas'))
 ## TODO
 - [x] Add 'Last Updated' to database record
 - [x] Add support for pip package
-- [ ] Add tickers from HK exchanges
+- [x] Add tickers from HK exchanges
 - [ ] Add docs in docs directory for readthedoc.io
 - [ ] Add multiprocessing for speed up
 - [ ] More robust error handling
