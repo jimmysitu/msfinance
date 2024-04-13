@@ -12,7 +12,7 @@ import json
 
 def test_stocks():
     proxy = 'socks5://127.0.0.1:1088'
-    session='/tmp/msfinance/msf.sql3'
+    session='/tmp/msfinance/msf.db3'
 
 
     if 'true' == os.getenv('GITHUB_ACTIONS'):
