@@ -11,7 +11,8 @@ stock = msf.Stock(
 )
 
 tickers_list = {
-    '2454', '2330',
+    '2454',
+    '2330',  # TSMC
 }
 
 for ticker in sorted(tickers_list):

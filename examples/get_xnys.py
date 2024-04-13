@@ -15,8 +15,8 @@ tickers_list = {
 }
 
 for ticker in sorted(tickers_list):
-    valuations = stock.get_valuations(ticker, 'xshg')
-    financials = stock.get_financials(ticker, 'xshg')
+    valuations = stock.get_valuations(ticker, 'xnys')
+    financials = stock.get_financials(ticker, 'xnys')
 
     print(f"Ticker: {ticker}")
     for valuation in valuations:
