@@ -129,7 +129,7 @@ class StockBase:
         '''
         if self.db:
             try:
-                query = f"SELECT * FROM {unique_id}"
+                query = f"SELECT * FROM '{unique_id}'"
                 df = pd.read_sql_query(query, self.db)
                 return df
             except pd.errors.DatabaseError as e:

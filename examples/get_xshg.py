@@ -11,7 +11,11 @@ stock = msf.Stock(
 )
 
 tickers_list = {
-    '603288', '600519', '688041',
+    '603288',   # Fosha Haitian
+    '600519',   # Kweichow Moutai
+    '688041',   # Hygon
+    '688047',   # Loongson
+
 }
 
 for ticker in sorted(tickers_list):
