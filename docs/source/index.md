@@ -27,7 +27,7 @@ print(stock.get_operating_and_efficiency('aapl', 'xnas'))
 print(stock.get_financial_health('aapl', 'xnas'))
 print(stock.get_cash_flow('aapl', 'xnas'))
 ```
-- More example is placed in [example](https://github.com/jimmysitu/msfinance/tree/main/example) directory. Add msfinance path to environment variable: PYTHONPATH, and run examples directly 
+- More examples are placed in [examples](https://github.com/jimmysitu/msfinance/tree/main/examples) directory. Add msfinance path to environment variable: PYTHONPATH, and run examples directly 
 
 ## [API](api.rst)
 
