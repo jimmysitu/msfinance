@@ -7,7 +7,7 @@ msfinance offers Pythonic way to download stocks financial data from [morningsta
 ![GitHub Workflow Status (with event)](https://img.shields.io/github/actions/workflow/status/jimmysitu/msfinance/python-package.yml)
 
 
-## Install
+## Installation
 ```bash
 pip install msfinance
 ```
