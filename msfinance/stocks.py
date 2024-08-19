@@ -63,7 +63,7 @@ class StockBase:
             self.options.set_preference("network.http.use-cache", True);
             # Use headless mode
             if not debug:
-                self.options.add_argument("-headless")
+                self.options.add_argument("--headless")
 
             self.webproxy = None
             if proxy:
