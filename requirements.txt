@@ -1,7 +1,6 @@
 retrying
 xlrd
 lxml
-tempfile
 requests
 pandas
 selenium
