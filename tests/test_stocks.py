@@ -1,5 +1,6 @@
 #!/usr/bin/python3 -u
 
+import tempfile
 import sqlite3
 from msfinance import stocks
 import os
@@ -12,7 +13,7 @@ import json
 
 def test_stocks():
     proxy = 'socks5://127.0.0.1:1088'
-    session='/tmp/msfinance/msf.db3'
+    session = os.path.join(tempfile.gettempdir(), 'msfinance', 'msf.db3')
 
 
     if 'true' == os.getenv('GITHUB_ACTIONS'):
@@ -37,7 +38,7 @@ def test_stocks():
 
     sp500_tickers = stock.get_sp500_tickers()
     assert 'AAPL' in sp500_tickers
-    
+
     hsi_tickers = stock.get_hsi_tickers()
     assert '00700' in hsi_tickers
 
