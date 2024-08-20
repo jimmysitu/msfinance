@@ -199,7 +199,7 @@ class StockBase:
         tmp_string = statistics_filename[statistics]
         tmp_file = self.download_dir + f"/{tmp_string}.xls"
 
-        retries = 10
+        retries = 5
         while retries and (not os.path.exists(tmp_file) or os.path.getsize(tmp_file) == 0):
             time.sleep(1)
             retries = retries - 1
