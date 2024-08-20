@@ -5,6 +5,7 @@ import time
 import json
 import sqlite3
 import requests
+import tempfile
 
 import pandas as pd
 
@@ -39,7 +40,7 @@ statistics_filename = {
 }
 
 class StockBase:
-    def __init__(self, debug=False, browser='firefox', session='/tmp/msfinance/msfinance.db', proxy=None):
+    def __init__(self, debug=False, browser='firefox', session='msfinance.db3', proxy=None):
         self.debug = debug
         if('chrome' == browser):
             # TODO: Add chrome support
@@ -49,7 +50,11 @@ class StockBase:
             self.options = webdriver.FirefoxOptions()
 
             # Settting download staff
-            self.download_dir = '/tmp/msfinance/' + str(os.getpid())
+            self.download_dir = os.path.join(tempfile.gettempdir(), 'msfinance', str(os.getpid()))
+
+            if not os.path.exists(self.download_dir):
+                os.makedirs(self.download_dir)
+
             self.options.set_preference("browser.download.folderList", 2)
             self.options.set_preference("browser.download.dir", self.download_dir)
             self.options.set_preference("browser.download.useDownloadDir", True)
