@@ -84,7 +84,7 @@ class StockBase:
                     print("No supported proxy protocal")
                     exit(1)
 
-#                # May works for Chrome                                     
+#                # May works for Chrome
 #                self.options.proxy = Proxy({
 #                   'proxyType': ProxyType.MANUAL,
 #                   'socksProxy': '127.0.0.1:1088',
@@ -106,7 +106,7 @@ class StockBase:
                 os.makedirs(dir, exist_ok=True)
             self.db = sqlite3.connect(session)
         else:
-            self.db = None 
+            self.db = None
 
         # Setup proxies of requests
         self.proxies = {
@@ -151,7 +151,7 @@ class StockBase:
             unique_id: Name of the table
 
         Returns:
-            True if update is done, else False 
+            True if update is done, else False
         '''
         if self.db:
             df['Last Updated'] = datetime.now()
@@ -166,19 +166,19 @@ class StockBase:
         # Compose an unique ID for database table and file name
         unique_id = f"{ticker}_{exchange}_{statistics}".replace(' ', '_').lower()
 
-        # Not force to update, check database first 
+        # Not force to update, check database first
         if not update:
             df = self._check_database(unique_id)
             if df is not None:
                 return df
-        
+
         # Fetch data from website starts here
         url = f"https://www.morningstar.com/stocks/{exchange}/{ticker}/valuation"
         self.driver.get(url)
 
         statistics_button = self.driver.find_element(By.XPATH, f"//button[contains(., '{statistics}')]")
         statistics_button.click()
-        
+
         export_button = WebDriverWait(self.driver, 30).until(
             EC.visibility_of_element_located((By.XPATH, "//button[contains(., 'Export Data')]"))
         )
@@ -191,19 +191,19 @@ class StockBase:
                     (By.XPATH, f"//div[contains(., 'There is no {statistics} data available.')]")
                 )
             )
-            return None  
+            return None
         except TimeoutException:
             export_button.click()
 
         # Wait download is done
         tmp_string = statistics_filename[statistics]
         tmp_file = self.download_dir + f"/{tmp_string}.xls"
-        
-        retries = 5
+
+        retries = 10
         while retries and (not os.path.exists(tmp_file) or os.path.getsize(tmp_file) == 0):
             time.sleep(1)
-            retries = retries - 1 
-        
+            retries = retries - 1
+
         if 0 == retries and (not os.path.exists(tmp_file)):
             raise ValueError("Export data fail")
 
@@ -211,7 +211,7 @@ class StockBase:
         os.rename(tmp_file, statistics_file)
         time.sleep(1)
 
-        # Update database 
+        # Update database
         df = pd.read_excel(statistics_file)
         if self.db:
             self._update_database(unique_id, df)
@@ -220,11 +220,11 @@ class StockBase:
 
     @retry(wait_fixed=2000, stop_max_attempt_number=3)
     def _get_financials(self, ticker, exchange, statement, period='Annual', stage='Restated', update=False):
-        
+
         # Compose an unique ID for database table and file name
         unique_id = f"{ticker}_{exchange}_{statement}_{period}_{stage}".replace(' ', '_').lower()
-        
-        # Not force to update, check database first 
+
+        # Not force to update, check database first
         if not update:
             df = self._check_database(unique_id)
             if df is not None:
@@ -250,7 +250,7 @@ class StockBase:
             period_button = self.driver.find_element(By.XPATH, "//span[contains(., 'Annual') and @class='mds-list-group__item-text__sal']")
         else:
             period_button = self.driver.find_element(By.XPATH, "//span[contains(., 'Quarterly') and @class='mds-list-group__item-text__sal']")
-        
+
         try:
             period_button.click()
             time.sleep(1)
@@ -259,7 +259,7 @@ class StockBase:
 
         # Select statement stage
         stage_list_button = self.driver.find_element(By.XPATH, "//button[contains(., 'As Originally Reported') and @aria-haspopup='true']")
-        try: 
+        try:
             stage_list_button.click()
             time.sleep(1)
         except ElementClickInterceptedException:
@@ -272,7 +272,7 @@ class StockBase:
         else:
             stage_button = self.driver.find_element(By.XPATH, "//span[contains(., 'Restated') and @class='mds-list-group__item-text__sal']")
 
-        try: 
+        try:
             stage_button.click()
             time.sleep(1)
         except ElementClickInterceptedException:
@@ -296,15 +296,15 @@ class StockBase:
         tmp_file = self.download_dir + f"/{statement}_{period}_{stage}.xls"
         while retries and (not os.path.exists(tmp_file)):
             time.sleep(1)
-            retries = retries - 1 
-        
+            retries = retries - 1
+
         if 0 == retries and (not os.path.exists(tmp_file)):
             raise ValueError("Export data fail")
 
         statement_file = self.download_dir + f"/{unique_id}.xls"
         os.rename(tmp_file, statement_file)
         time.sleep(1)
-    
+
         # Update datebase
         df = pd.read_excel(statement_file)
         if self.db:
@@ -316,13 +316,13 @@ class StockBase:
 
         unique_id = f"us_exchange_{exchange}_tickers"
 
-        # Not force to update, check database first 
+        # Not force to update, check database first
         if not update:
             df = self._check_database(unique_id)
             if df is not None:
                 symbols = df['symbol'].tolist()
                 return symbols
-        
+
         # The api.nasdaq.com needs a request with headers, or it won't response
         headers = {
             'accept': 'application/json, text/plain, */*',
@@ -350,7 +350,7 @@ class Stock(StockBase):
     def get_growth(self, ticker, exchange, update=False):
         '''
         Get growth statistics of stock
-        
+
         Args:
             ticker: Stock symbol
             exchange: Exchange name
@@ -360,11 +360,11 @@ class Stock(StockBase):
         '''
         statistics = 'Growth'
         return self._get_valuation(ticker, exchange, statistics, update)
-    
+
     def get_operating_and_efficiency(self, ticker, exchange, update=False):
         '''
         Get operating and efficiency statistics of stock
-        
+
         Args:
             ticker: Stock symbol
             exchange: Exchange name
@@ -373,11 +373,11 @@ class Stock(StockBase):
         '''
         statistics = 'Operating and Efficiency'
         return self._get_valuation(ticker, exchange, statistics, update)
-    
+
     def get_financial_health(self, ticker, exchange, update=False):
         '''
         Get financial health statistics of stock
-        
+
         Args:
             ticker: Stock symbol
             exchange: Exchange name
@@ -386,11 +386,11 @@ class Stock(StockBase):
         '''
         statistics = 'Financial Health'
         return self._get_valuation(ticker, exchange, statistics, update)
-    
+
     def get_cash_flow(self, ticker, exchange, update=False):
         '''
         Get cash flow statistics of stock
-        
+
         Args:
             ticker: Stock symbol
             exchange: Exchange name
@@ -403,7 +403,7 @@ class Stock(StockBase):
     def get_valuations(self, ticker, exchange, update=False):
         '''
         Get all valuations of stock
-        
+
         Args:
             ticker: Stock symbol
             exchange: Exchange name
@@ -415,13 +415,13 @@ class Stock(StockBase):
         for statistics in ['Growth', 'Operating and Efficiency', 'Financial Health','Cash Flow']:
             df = self._get_valuation(ticker, exchange, statistics, update)
             self.valuations.append(df)
-        
+
         return self.valuations
 
     def get_income_statement(self, ticker, exchange, period='Annual', stage='Restated', update=False):
         '''
         Get income statement of stock
-        
+
         Args:
             ticker: Stock symbol
             exchange: Exchange name
@@ -436,7 +436,7 @@ class Stock(StockBase):
     def get_balance_sheet_statement(self, ticker, exchange, period='Annual', stage='Restated', update=False):
         '''
         Get balance sheet statement of stock
-        
+
         Args:
             ticker: Stock symbol
             exchange: Exchange name
@@ -451,7 +451,7 @@ class Stock(StockBase):
     def get_cash_flow_statement(self, ticker, exchange, period='Annual', stage='Restated', update=False):
         '''
         Get cash flow statement of stock
-        
+
         Args:
             ticker: Stock symbol
             exchange: Exchange name
@@ -466,7 +466,7 @@ class Stock(StockBase):
     def get_financials(self, ticker, exchange, period='Annual', stage='As Originally Reported', update=False):
         '''
         Get all financials statements of stock
-        
+
         Args:
             ticker: Stock symbol
             exchange: Exchange name
@@ -489,7 +489,7 @@ class Stock(StockBase):
 
         Returns:
             List of ticker with 5-digital number string
-        ''' 
+        '''
         url = "https://en.wikipedia.org/wiki/Hang_Seng_Index"
         response = requests.get(url, proxies=self.proxies)
         tables = pd.read_html(response.text)
@@ -511,8 +511,8 @@ class Stock(StockBase):
         tables = pd.read_html(response.text)
         symbols = tables[0]['Symbol'].tolist()
         return symbols
-    
-    
+
+
     def get_xnas_tickers(self):
         '''
         Get tickers of NASDAQ
@@ -520,7 +520,7 @@ class Stock(StockBase):
         Returns:
             List of ticker names in NASDAQ
         '''
-        
+
         exchange = 'nasdaq'
         return self._get_us_exchange_tickers(exchange)
 
@@ -531,7 +531,7 @@ class Stock(StockBase):
         Returns:
             List of ticker names in NYSE
         '''
-        
+
         exchange = 'nyse'
         return self._get_us_exchange_tickers(exchange)
 
@@ -542,10 +542,8 @@ class Stock(StockBase):
         Returns:
             List of ticker names in AMEX
         '''
-        
+
         exchange = 'amex'
         return self._get_us_exchange_tickers(exchange)
-
-
 
 # End of class Stock
