@@ -46,7 +46,7 @@ print(stock.get_cash_flow('aapl', 'xnas'))
 - [x] Add 'Last Updated' to database record
 - [x] Add support for pip package
 - [x] Add tickers from HK exchanges
-- [ ] Add docs in docs directory for readthedoc.io
+- [x] Add docs in docs directory for readthedoc.io
 - [ ] Add multiprocessing for speed up
 - [ ] More robust error handling
 - [ ] Add more statistics valuations

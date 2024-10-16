@@ -1,4 +1,3 @@
-
 import os
 import re
 import time
@@ -24,6 +23,10 @@ from selenium.common.exceptions import ElementClickInterceptedException
 from selenium.common.exceptions import ElementNotInteractableException
 from selenium.common.exceptions import TimeoutException
 
+import sqlalchemy
+from sqlalchemy import create_engine
+from sqlalchemy.orm import sessionmaker
+
 
 # For Chrome driver
 from webdriver_manager.chrome import ChromeDriverManager
@@ -43,8 +46,43 @@ class StockBase:
     def __init__(self, debug=False, browser='firefox', session='msfinance.db3', proxy=None):
         self.debug = debug
         if('chrome' == browser):
-            # TODO: Add chrome support
-            pass
+            # Chrome support
+            self.options = webdriver.ChromeOptions()
+
+            # Setting download staff
+            self.download_dir = os.path.join(tempfile.gettempdir(), 'msfinance', str(os.getpid()))
+
+            if not os.path.exists(self.download_dir):
+                os.makedirs(self.download_dir)
+
+            prefs = {
+                "download.default_directory": self.download_dir,
+                "download.prompt_for_download": False,
+                "download.directory_upgrade": True,
+                "safebrowsing.enabled": True,
+                "profile.default_content_setting_values.automatic_downloads": 1,
+            }
+            self.options.add_experimental_option("prefs", prefs)
+
+            # Use headless mode
+            if not debug:
+                self.options.add_argument("--headless")
+
+            self.webproxy = None
+            if proxy:
+                [protocal, host, port] = re.split(r'://|:', proxy)
+                if 'socks5' == protocal:
+                    self.options.add_argument(f'--proxy-server=socks5://{host}:{port}')
+                else:
+                    print("No supported proxy protocal")
+                    exit(1)
+
+            self.options.add_argument(
+                "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36")
+            
+            self.driver = webdriver.Chrome(
+                service=webdriver.ChromeService(ChromeDriverManager().install()),
+                options=self.options)
         else:
             # Default: firefox
             self.options = webdriver.FirefoxOptions()
@@ -66,6 +104,11 @@ class StockBase:
             self.options.set_preference("browser.cache.memory.enable", True);
             self.options.set_preference("browser.cache.offline.enable", True);
             self.options.set_preference("network.http.use-cache", True);
+
+            self.options.set_preference(
+                "general.useragent.override", 
+                "Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:128.0) Gecko/20100101 Firefox/128.0")
+
             # Use headless mode
             if not debug:
                 self.options.add_argument("--headless")
@@ -84,29 +127,13 @@ class StockBase:
                     print("No supported proxy protocal")
                     exit(1)
 
-#                # May works for Chrome
-#                self.options.proxy = Proxy({
-#                   'proxyType': ProxyType.MANUAL,
-#                   'socksProxy': '127.0.0.1:1088',
-#                   'socksVersion': 5,
-#                })
-#                # Or
-#                self.options.add_argument(f"--proxy-server={proxy}")
-
-
             self.driver = webdriver.Firefox(
                 service=webdriver.FirefoxService(GeckoDriverManager().install()),
-                options=self.options,
-            )
+                options=self.options)
 
-        # Initial session storage
-        if session:
-            dir = os.path.dirname(session)
-            if dir:
-                os.makedirs(dir, exist_ok=True)
-            self.db = sqlite3.connect(session)
-        else:
-            self.db = None
+        # Setup SQLAlchemy engine and session
+        self.engine = create_engine(f'sqlite:///{session}', pool_size=5, max_overflow=10)
+        self.Session = sessionmaker(bind=self.engine)
 
         # Setup proxies of requests
         self.proxies = {
@@ -114,13 +141,19 @@ class StockBase:
             "https": proxy,
         }
 
+        # Open Morningstar home page
+        url = f"https://www.morningstar.com"
+        self.driver.get(url)
+        # Wait for the page to load, and pass the human verification
+        time.sleep(30)
+
+        url = f"https://www.morningstar.com/stocks"
+        self.driver.get(url)
+        time.sleep(20)
+
     def __del__(self):
         if not self.debug:
             self.driver.quit()
-
-        # Close database
-        if self.db:
-            self.db.close()
 
     def _check_database(self, unique_id):
         '''
@@ -132,15 +165,17 @@ class StockBase:
         Returns:
             DataFrame of the table, or None
         '''
-        if self.db:
-            try:
-                query = f"SELECT * FROM '{unique_id}'"
-                df = pd.read_sql_query(query, self.db)
-                return df
-            except pd.errors.DatabaseError as e:
-                return None
-        else:
+        session = self.Session()
+        try:
+            query = f"SELECT * FROM '{unique_id}'"
+            df = pd.read_sql_query(query, session.bind)
+            return df
+        except sqlalchemy.exc.OperationalError as e:
+            # Log the error or handle it as needed
+            print(f"OperationalError: {e}")
             return None
+        finally:
+            session.close()
 
     def _update_database(self, unique_id, df):
         '''
@@ -153,12 +188,13 @@ class StockBase:
         Returns:
             True if update is done, else False
         '''
-        if self.db:
+        session = self.Session()
+        try:
             df['Last Updated'] = datetime.now()
-            df.to_sql(unique_id, self.db, if_exists='replace', index=False)
+            df.to_sql(unique_id, session.bind, if_exists='replace', index=False)
             return True
-        else:
-            return False
+        finally:
+            session.close()
 
     @retry(wait_fixed=2000, stop_max_attempt_number=3)
     def _get_valuation(self, ticker, exchange, statistics, update=False):
@@ -185,7 +221,6 @@ class StockBase:
 
         # Check if there is no such data available
         try:
-            # FIXME: Try a faster way to figure out data available instead of this
             WebDriverWait(self.driver, 5).until(
                 EC.visibility_of_element_located(
                     (By.XPATH, f"//div[contains(., 'There is no {statistics} data available.')]")
@@ -213,8 +248,7 @@ class StockBase:
 
         # Update database
         df = pd.read_excel(statistics_file)
-        if self.db:
-            self._update_database(unique_id, df)
+        self._update_database(unique_id, df)
 
         return df
 
@@ -307,8 +341,7 @@ class StockBase:
 
         # Update datebase
         df = pd.read_excel(statement_file)
-        if self.db:
-            self._update_database(unique_id, df)
+        self._update_database(unique_id, df)
 
         return df
 
@@ -335,8 +368,7 @@ class StockBase:
         df = pd.DataFrame(tmp_data['data']['rows'])
 
         # Update datebase
-        if self.db:
-            self._update_database(unique_id, df)
+        self._update_database(unique_id, df)
 
         symbols = df['symbol'].tolist()
         return symbols
