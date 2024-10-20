@@ -4,5 +4,7 @@ lxml
 requests
 pandas
 selenium
+sqlalchemy
+undetected-chromedriver
 webdriver_manager
 

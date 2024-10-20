@@ -1,4 +1,5 @@
 import os
+import random
 import re
 import time
 import json
@@ -16,7 +17,7 @@ from selenium.webdriver.common.keys import Keys
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
-from selenium.webdriver.common.proxy import Proxy, ProxyType
+from selenium.webdriver.common.action_chains import ActionChains
 
 from selenium.common.exceptions import NoSuchElementException
 from selenium.common.exceptions import ElementClickInterceptedException
@@ -27,12 +28,15 @@ import sqlalchemy
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
+import undetected_chromedriver as uc
 
 # For Chrome driver
 from webdriver_manager.chrome import ChromeDriverManager
 
-# Form Firefox driver
+# For Firefox driver
 from webdriver_manager.firefox import GeckoDriverManager
+
+from fake_useragent import UserAgent
 
 # Mapping statistics string to statistics file name
 statistics_filename = {
@@ -43,52 +47,64 @@ statistics_filename = {
 }
 
 class StockBase:
-    def __init__(self, debug=False, browser='firefox', session='msfinance.db3', proxy=None):
+    def __init__(self, debug=False, browser='chrome', database='msfinance.db3', session_factory=None, proxy=None):
         self.debug = debug
+        
+        # Initialize UserAgent for random user-agent generation
+        self.ua = UserAgent()
+
         if('chrome' == browser):
             # Chrome support
             self.options = webdriver.ChromeOptions()
 
-            # Setting download staff
+            # Set a random user-agent
+            self.options.add_argument(f"--user-agent={self.ua.random}")
+
+            # Setting download directory
             self.download_dir = os.path.join(tempfile.gettempdir(), 'msfinance', str(os.getpid()))
+            if debug:
+                print(f"Download directory: {self.download_dir}")
 
             if not os.path.exists(self.download_dir):
                 os.makedirs(self.download_dir)
 
-            prefs = {
-                "download.default_directory": self.download_dir,
-                "download.prompt_for_download": False,
-                "download.directory_upgrade": True,
-                "safebrowsing.enabled": True,
-                "profile.default_content_setting_values.automatic_downloads": 1,
-            }
-            self.options.add_experimental_option("prefs", prefs)
-
             # Use headless mode
             if not debug:
                 self.options.add_argument("--headless")
+            else:
+                self.options.add_argument("--start-maximized")
+                self.options.add_argument("--disable-popup-blocking")
 
-            self.webproxy = None
             if proxy:
-                [protocal, host, port] = re.split(r'://|:', proxy)
-                if 'socks5' == protocal:
+                [protocol, host, port] = re.split(r'://|:', proxy)
+                if 'socks5' == protocol:
                     self.options.add_argument(f'--proxy-server=socks5://{host}:{port}')
                 else:
-                    print("No supported proxy protocal")
+                    print("No supported proxy protocol")
                     exit(1)
 
-            self.options.add_argument(
-                "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36")
-            
-            self.driver = webdriver.Chrome(
-                service=webdriver.ChromeService(ChromeDriverManager().install()),
+            # Initialize the undetected_chromedriver
+            self.driver = uc.Chrome(
+                version_main=126,
+                use_subprocess=False,
+                service=webdriver.ChromeService(ChromeDriverManager(driver_version='126').install()),
                 options=self.options)
+
+            # Change download directory
+            params = {
+                "behavior": "allow",
+                "downloadPath": self.download_dir,
+            }
+            self.driver.execute_cdp_cmd("Page.setDownloadBehavior", params)
+
         else:
             # Default: firefox
             self.options = webdriver.FirefoxOptions()
 
-            # Settting download staff
+            # Setting download directory
             self.download_dir = os.path.join(tempfile.gettempdir(), 'msfinance', str(os.getpid()))
+            if debug:
+                print(f"Download directory: {self.download_dir}")
 
             if not os.path.exists(self.download_dir):
                 os.makedirs(self.download_dir)
@@ -100,42 +116,43 @@ class StockBase:
             self.options.set_preference("browser.download.manager.showWhenStarting", False)
             self.options.set_preference("browser.helperApps.neverAsk.saveToDisk", "application/octet-stream")
             # Enable cache
-            self.options.set_preference("browser.cache.disk.enable", True);
-            self.options.set_preference("browser.cache.memory.enable", True);
-            self.options.set_preference("browser.cache.offline.enable", True);
-            self.options.set_preference("network.http.use-cache", True);
+            self.options.set_preference("browser.cache.disk.enable", True)
+            self.options.set_preference("browser.cache.memory.enable", True)
+            self.options.set_preference("browser.cache.offline.enable", True)
+            self.options.set_preference("network.http.use-cache", True)
 
-            self.options.set_preference(
-                "general.useragent.override", 
-                "Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:128.0) Gecko/20100101 Firefox/128.0")
+            self.options.set_preference("general.useragent.override", self.ua.random)
 
             # Use headless mode
             if not debug:
                 self.options.add_argument("--headless")
 
-            self.webproxy = None
             if proxy:
-                [protocal, host, port] = re.split(r'://|:', proxy)
-                # Use set_preference method can enable the DNS proxy
+                [protocol, host, port] = re.split(r'://|:', proxy)
+                # Use set_preference method to enable the DNS proxy
                 self.options.set_preference('network.proxy.type', 1)
-                if 'socks5' == protocal:
+                if 'socks5' == protocol:
                     self.options.set_preference('network.proxy.socks', host)
                     self.options.set_preference('network.proxy.socks_port', int(port))
                     self.options.set_preference('network.proxy.socks_version', 5)
                     self.options.set_preference('network.proxy.socks_remote_dns', True)
                 else:
-                    print("No supported proxy protocal")
+                    print("No supported proxy protocol")
                     exit(1)
 
             self.driver = webdriver.Firefox(
                 service=webdriver.FirefoxService(GeckoDriverManager().install()),
                 options=self.options)
 
-        # Setup SQLAlchemy engine and session
-        self.engine = create_engine(f'sqlite:///{session}', pool_size=5, max_overflow=10)
-        self.Session = sessionmaker(bind=self.engine)
+        if session_factory is not None:
+            self.Session = session_factory
+        else:
+            # Setup SQLAlchemy engine and session
+            self.engine = create_engine(f'sqlite:///{database}', pool_size=5, max_overflow=10)
+            self.Session = sessionmaker(bind=self.engine)
 
-        # Setup proxies of requests
+
+        # Setup proxies for requests
         self.proxies = {
             "http": proxy,
             "https": proxy,
@@ -149,7 +166,7 @@ class StockBase:
 
         url = f"https://www.morningstar.com/stocks"
         self.driver.get(url)
-        time.sleep(20)
+        time.sleep(10)
 
     def __del__(self):
         if not self.debug:
@@ -196,10 +213,57 @@ class StockBase:
         finally:
             session.close()
 
+    def _human_delay(self, min=3, max=15):
+        '''Simulate human-like random delay'''
+        time.sleep(random.uniform(min, max))
+
+    def _random_mouse_move(self):
+        '''Simulate random mouse movement'''
+        actions = ActionChains(self.driver)
+        # Get window size
+        window_size = self.driver.get_window_size()
+        # Random start position
+        start_x = random.randint(0, window_size['width'] - 1)
+        start_y = random.randint(0, window_size['height'] - 1)
+        actions.move_by_offset(start_x, start_y).perform()
+        self._human_delay(0.5, 1.5)
+        # Random end position
+        end_x = random.randint(0, window_size['width'] - 1)
+        end_y = random.randint(0, window_size['height'] - 1)
+        actions.move_by_offset(end_x, end_y).perform()
+        self._human_delay(0.5, 1.5)
+
+    def _random_scroll(self):
+        '''Simulate random page scrolling'''
+        scroll_height = self.driver.execute_script("return document.body.scrollHeight")
+        random_position = random.randint(0, scroll_height)
+        self.driver.execute_script(f"window.scrollTo(0, {random_position});")
+        self._human_delay(0.5, 1.5)
+
+    def _random_click(self):
+        '''Simulate random click on a blank area of the page'''
+        window_size = self.driver.get_window_size()
+        x = random.randint(0, window_size['width'])
+        y = random.randint(0, window_size['height'])
+        try:
+            actions = ActionChains(self.driver)
+            actions.move_by_offset(x, y).click().perform()
+            self._human_delay(1, 2)
+            # Reset mouse position
+            actions.move_by_offset(-x, -y).perform()
+        except Exception:
+            pass  # Ignore exceptions from failed clicks
+
+    def _random_typing(self, element, text):
+        '''Simulate random keyboard typing'''
+        for char in text:
+            element.send_keys(char)
+            time.sleep(random.uniform(0.05, 0.3))  # Random delay between each character
+
     @retry(wait_fixed=2000, stop_max_attempt_number=3)
     def _get_valuation(self, ticker, exchange, statistics, update=False):
 
-        # Compose an unique ID for database table and file name
+        # Compose a unique ID for database table and file name
         unique_id = f"{ticker}_{exchange}_{statistics}".replace(' ', '_').lower()
 
         # Not force to update, check database first
@@ -212,8 +276,18 @@ class StockBase:
         url = f"https://www.morningstar.com/stocks/{exchange}/{ticker}/valuation"
         self.driver.get(url)
 
+        # Simulate human-like operations
+        self._random_mouse_move()
+        self._human_delay()
+        self._random_scroll()
+
         statistics_button = self.driver.find_element(By.XPATH, f"//button[contains(., '{statistics}')]")
         statistics_button.click()
+
+        # More human-like operations
+        self._random_click()
+        self._human_delay()
+        self._random_scroll()
 
         export_button = WebDriverWait(self.driver, 30).until(
             EC.visibility_of_element_located((By.XPATH, "//button[contains(., 'Export Data')]"))
@@ -230,7 +304,7 @@ class StockBase:
         except TimeoutException:
             export_button.click()
 
-        # Wait download is done
+        # Wait for download to complete
         tmp_string = statistics_filename[statistics]
         tmp_file = self.download_dir + f"/{tmp_string}.xls"
 
@@ -255,7 +329,7 @@ class StockBase:
     @retry(wait_fixed=2000, stop_max_attempt_number=3)
     def _get_financials(self, ticker, exchange, statement, period='Annual', stage='Restated', update=False):
 
-        # Compose an unique ID for database table and file name
+        # Compose a unique ID for database table and file name
         unique_id = f"{ticker}_{exchange}_{statement}_{period}_{stage}".replace(' ', '_').lower()
 
         # Not force to update, check database first
@@ -268,15 +342,25 @@ class StockBase:
         url = f"https://www.morningstar.com/stocks/{exchange}/{ticker}/financials"
         self.driver.get(url)
 
+        # Simulate human-like operations
+        self._random_mouse_move()
+        self._human_delay()
+        self._random_scroll()
+
         # Select statement type
         type_button = self.driver.find_element(By.XPATH, f"//button[contains(., '{statement}')]")
         type_button.click()
+
+        # More human-like operations
+        self._random_click()
+        self._human_delay()
+        self._random_scroll()
 
         # Select statement period
         period_list_button = self.driver.find_element(By.XPATH, "//button[contains(., 'Annual') and @aria-haspopup='true']")
         try:
             period_list_button.click()
-            time.sleep(1)
+            self._human_delay()
         except ElementClickInterceptedException:
             pass
 
@@ -287,7 +371,7 @@ class StockBase:
 
         try:
             period_button.click()
-            time.sleep(1)
+            self._human_delay()
         except ElementClickInterceptedException:
             pass
 
@@ -295,7 +379,7 @@ class StockBase:
         stage_list_button = self.driver.find_element(By.XPATH, "//button[contains(., 'As Originally Reported') and @aria-haspopup='true']")
         try:
             stage_list_button.click()
-            time.sleep(1)
+            self._human_delay()
         except ElementClickInterceptedException:
             pass
         except ElementNotInteractableException:
@@ -308,7 +392,7 @@ class StockBase:
 
         try:
             stage_button.click()
-            time.sleep(1)
+            self._human_delay()
         except ElementClickInterceptedException:
             pass
         except ElementNotInteractableException:
@@ -320,13 +404,18 @@ class StockBase:
         )
         expand_detail_view.click()
 
+        # More human-like operations
+        self._random_mouse_move()
+        self._human_delay()
+        self._random_scroll()
+
         export_button = WebDriverWait(self.driver, 30).until(
             EC.visibility_of_element_located((By.XPATH, "//button[contains(., 'Export Data')]"))
         )
         export_button.click()
 
         retries = 5
-        # Wait download is done
+        # Wait for download to complete
         tmp_file = self.download_dir + f"/{statement}_{period}_{stage}.xls"
         while retries and (not os.path.exists(tmp_file)):
             time.sleep(1)
@@ -339,7 +428,7 @@ class StockBase:
         os.rename(tmp_file, statement_file)
         time.sleep(1)
 
-        # Update datebase
+        # Update database
         df = pd.read_excel(statement_file)
         self._update_database(unique_id, df)
 
@@ -356,10 +445,10 @@ class StockBase:
                 symbols = df['symbol'].tolist()
                 return symbols
 
-        # The api.nasdaq.com needs a request with headers, or it won't response
+        # Use fake_useragent to generate a random user-agent
         headers = {
             'accept': 'application/json, text/plain, */*',
-            'user-agent': 'Mozilla/5.0 (X11; Linux x86_64) Chrome/116.0.0.0 Safari/537.36 Edg/116.0.1938.76',
+            'user-agent': self.ua.random,  # Use random user-agent
         }
         url=f'https://api.nasdaq.com/api/screener/stocks?tableonly=true&exchange={exchange}&download=true'
         response = requests.get(url, headers=headers)
@@ -520,7 +609,7 @@ class Stock(StockBase):
         Get ticker of Hang Seng Index
 
         Returns:
-            List of ticker with 5-digital number string
+            List of ticker with 5-digit number string
         '''
         url = "https://en.wikipedia.org/wiki/Hang_Seng_Index"
         response = requests.get(url, proxies=self.proxies)
@@ -544,7 +633,6 @@ class Stock(StockBase):
         symbols = tables[0]['Symbol'].tolist()
         return symbols
 
-
     def get_xnas_tickers(self):
         '''
         Get tickers of NASDAQ
@@ -552,7 +640,6 @@ class Stock(StockBase):
         Returns:
             List of ticker names in NASDAQ
         '''
-
         exchange = 'nasdaq'
         return self._get_us_exchange_tickers(exchange)
 
@@ -563,7 +650,6 @@ class Stock(StockBase):
         Returns:
             List of ticker names in NYSE
         '''
-
         exchange = 'nyse'
         return self._get_us_exchange_tickers(exchange)
 
@@ -574,8 +660,9 @@ class Stock(StockBase):
         Returns:
             List of ticker names in AMEX
         '''
-
         exchange = 'amex'
         return self._get_us_exchange_tickers(exchange)
 
 # End of class Stock
+
+

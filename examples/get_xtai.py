@@ -5,8 +5,9 @@ import msfinance as msf
 proxy = 'socks5://127.0.0.1:1088'
 
 stock = msf.Stock(
-    debug=True, 
-    session='xtai.db3',
+    debug=True,
+    browser='chrome',
+    database='xtai.db3',
     proxy=proxy,
 )
 

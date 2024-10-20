@@ -18,7 +18,7 @@ pip install msfinance
 import msfinance as msf
 
 stock = msf.Stock(
-    session='msf_database.db3',
+    database='msf_database.db3',
 )
 
 

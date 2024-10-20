@@ -6,7 +6,7 @@ proxy = 'socks5://127.0.0.1:1088'
 
 stock = msf.Stock(
     debug=True,
-    session='xshg.db3',
+    database='xshg.db3',
     proxy=proxy,
 )
 
