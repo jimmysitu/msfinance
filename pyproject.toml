@@ -17,15 +17,15 @@ classifiers = [
 requires-python = ">=3.8"
 license = {file = "LICENSE"}
 dependencies = [
-    "retrying",
-    "xlrd",
-    "lxml",
     "requests",
     "pandas",
+    "tenacity",
     "selenium",
     "sqlalchemy",
+    "fake-useragent",
+    "selenium-stealth",
     "undetected-chromedriver",
-    "webdriver_manager"
+    "webdriver-manager"
 ]
 
 [project.urls]

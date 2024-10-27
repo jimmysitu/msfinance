@@ -3,17 +3,15 @@ import random
 import re
 import time
 import json
-import sqlite3
 import requests
 import tempfile
 
 import pandas as pd
 
-from retrying import retry
+from tenacity import retry, wait_random, stop_after_attempt
 from datetime import datetime
 
 from selenium import webdriver
-from selenium.webdriver.common.keys import Keys
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
@@ -24,9 +22,12 @@ from selenium.common.exceptions import ElementClickInterceptedException
 from selenium.common.exceptions import ElementNotInteractableException
 from selenium.common.exceptions import TimeoutException
 
+
 import sqlalchemy
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
+
+from fake_useragent import UserAgent
 
 from selenium_stealth import stealth
 import undetected_chromedriver as uc
@@ -37,7 +38,6 @@ from webdriver_manager.chrome import ChromeDriverManager
 # For Firefox driver
 from webdriver_manager.firefox import GeckoDriverManager
 
-from fake_useragent import UserAgent
 
 # Mapping statistics string to statistics file name
 statistics_filename = {
@@ -46,6 +46,7 @@ statistics_filename = {
     'Financial Health':             'financialHealth',
     'Cash Flow':                    'cashFlow',
 }
+
 
 class StockBase:
     def __init__(self, debug=False, browser='chrome', database='msfinance.db3', session_factory=None, proxy=None, driver_type='uc'):
@@ -56,55 +57,14 @@ class StockBase:
 
         self.driver_type = driver_type
 
+        # Setup driver
         if browser == 'chrome':
             self.setup_chrome_driver(proxy)
         else:
             # Default: firefox
-            self.options = webdriver.FirefoxOptions()
+            self.setup_firefox_driver(proxy)
 
-            # Setting download directory
-            self.download_dir = os.path.join(tempfile.gettempdir(), 'msfinance', str(os.getpid()))
-            if debug:
-                print(f"Download directory: {self.download_dir}")
-
-            if not os.path.exists(self.download_dir):
-                os.makedirs(self.download_dir)
-
-            self.options.set_preference("browser.download.folderList", 2)
-            self.options.set_preference("browser.download.dir", self.download_dir)
-            self.options.set_preference("browser.download.useDownloadDir", True)
-            self.options.set_preference("browser.download.viewableInternally.enabledTypes", "")
-            self.options.set_preference("browser.download.manager.showWhenStarting", False)
-            self.options.set_preference("browser.helperApps.neverAsk.saveToDisk", "application/octet-stream")
-            # Enable cache
-            self.options.set_preference("browser.cache.disk.enable", True)
-            self.options.set_preference("browser.cache.memory.enable", True)
-            self.options.set_preference("browser.cache.offline.enable", True)
-            self.options.set_preference("network.http.use-cache", True)
-
-            self.options.set_preference("general.useragent.override", self.ua.random)
-
-            # Use headless mode
-            if not debug:
-                self.options.add_argument("--headless")
-
-            if proxy:
-                [protocol, host, port] = re.split(r'://|:', proxy)
-                # Use set_preference method to enable the DNS proxy
-                self.options.set_preference('network.proxy.type', 1)
-                if 'socks5' == protocol:
-                    self.options.set_preference('network.proxy.socks', host)
-                    self.options.set_preference('network.proxy.socks_port', int(port))
-                    self.options.set_preference('network.proxy.socks_version', 5)
-                    self.options.set_preference('network.proxy.socks_remote_dns', True)
-                else:
-                    print("No supported proxy protocol")
-                    exit(1)
-
-            self.driver = webdriver.Firefox(
-                service=webdriver.FirefoxService(GeckoDriverManager().install()),
-                options=self.options)
-
+        # Setup session
         if session_factory is not None:
             self.Session = session_factory
         else:
@@ -122,11 +82,46 @@ class StockBase:
         # Open Morningstar stock page
         url = f"https://www.morningstar.com/stocks"
         self.driver.get(url)
-        time.sleep(20)
+        time.sleep(15)
+
+        if self.debug:
+            print(f"Driver initialized")
 
     def __del__(self):
         if not self.debug:
             self.driver.quit()
+
+    def reset_driver(self, retry_state=None):
+        '''Reset the driver'''
+
+        if retry_state is not None:
+            print("Retry State Information:")
+            print(f"  Attempt number: {retry_state.attempt_number}")
+            
+            try:
+                print(f"  Last result: {retry_state.outcome.result()}")
+            except Exception as e:
+                print(f"  Last result: {e}")
+            
+            try:
+                print(f"  Last exception: {retry_state.outcome.exception()}")
+            except Exception as e:
+                print(f"  Last exception: {e}")
+            
+            print(f"  Time elapsed: {retry_state.seconds_since_start}")
+        
+        if self.driver:
+            self.driver.quit()
+    
+        # Assuming the driver is a Chrome or Firefox driver
+        # You might need to adjust this logic based on your actual driver setup
+        if isinstance(self.driver, webdriver.Chrome):
+            self.setup_chrome_driver(self.proxies['http'])
+        elif isinstance(self.driver, uc.Chrome):
+            self.setup_chrome_driver(self.proxies['http'])
+        else:
+            self.setup_firefox_driver(self.proxies['http'])
+
 
     def setup_chrome_driver(self, proxy):
         # Chrome support
@@ -150,7 +145,7 @@ class StockBase:
             self.options.add_argument("--start-maximized")
             self.options.add_argument("--disable-popup-blocking")
 
-        if proxy:
+        if proxy is not None:
             [protocol, host, port] = re.split(r'://|:', proxy)
             if 'socks5' == protocol:
                 self.options.add_argument(f'--proxy-server=socks5://{host}:{port}')
@@ -159,7 +154,16 @@ class StockBase:
                 exit(1)
 
         # Initialize the undetected_chromedriver
-        self.initialize_driver()
+        self.initialize_chrome_driver()
+
+        # Override the webdriver property, make more undetected 
+        self.driver.execute_cdp_cmd("Page.addScriptToEvaluateOnNewDocument", {
+            "source": """
+                Object.defineProperty(navigator, 'webdriver', {
+                    get: () => undefined
+                })
+            """
+        })
 
         # Change download directory
         params = {
@@ -167,6 +171,52 @@ class StockBase:
             "downloadPath": self.download_dir,
         }
         self.driver.execute_cdp_cmd("Page.setDownloadBehavior", params)
+
+    def setup_firefox_driver(self, proxy):
+        self.options = webdriver.FirefoxOptions()
+
+        # Setting download directory
+        self.download_dir = os.path.join(tempfile.gettempdir(), 'msfinance', str(os.getpid()))
+        if self.debug:
+            print(f"Download directory: {self.download_dir}")
+
+        if not os.path.exists(self.download_dir):
+            os.makedirs(self.download_dir)
+
+        self.options.set_preference("browser.download.folderList", 2)
+        self.options.set_preference("browser.download.dir", self.download_dir)
+        self.options.set_preference("browser.download.useDownloadDir", True)
+        self.options.set_preference("browser.download.viewableInternally.enabledTypes", "")
+        self.options.set_preference("browser.download.manager.showWhenStarting", False)
+        self.options.set_preference("browser.helperApps.neverAsk.saveToDisk", "application/octet-stream")
+        # Enable cache
+        self.options.set_preference("browser.cache.disk.enable", True)
+        self.options.set_preference("browser.cache.memory.enable", True)
+        self.options.set_preference("browser.cache.offline.enable", True)
+        self.options.set_preference("network.http.use-cache", True)
+
+        self.options.set_preference("general.useragent.override", self.ua.random)
+
+        # Use headless mode
+        if not self.debug:
+            self.options.add_argument("--headless")
+
+        if proxy is not None:
+            [protocol, host, port] = re.split(r'://|:', proxy)
+            # Use set_preference method to enable the DNS proxy
+            self.options.set_preference('network.proxy.type', 1)
+            if 'socks5' == protocol:
+                self.options.set_preference('network.proxy.socks', host)
+                self.options.set_preference('network.proxy.socks_port', int(port))
+                self.options.set_preference('network.proxy.socks_version', 5)
+                self.options.set_preference('network.proxy.socks_remote_dns', True)
+            else:
+                print("No supported proxy protocol")
+                exit(1)
+
+        self.driver = webdriver.Firefox(
+            service=webdriver.FirefoxService(GeckoDriverManager().install()),
+            options=self.options)
 
     def _check_database(self, unique_id):
         '''
@@ -215,42 +265,25 @@ class StockBase:
 
     def _random_mouse_move(self):
         '''Simulate random mouse movement'''
-        if self.debug:
-            print("Simulate random mouse movement")
         actions = ActionChains(self.driver)
         
         element = self.driver.find_element(By.TAG_NAME, 'body')
         target_x = random.randint(100, 200)
         target_y = random.randint(100, 200)
         if self.debug:
-            print(f"Target position: {target_x}, {target_y}")
+            print(f"Simulate random mouse movement, target position: {target_x}, {target_y}")
         actions.move_to_element_with_offset(element, target_x, target_y).perform()
         self._human_delay(1, 5)
         
     def _random_scroll(self):
         '''Simulate random page scrolling'''
-        if self.debug:
-            print("Simulate random page scrolling")
+        
         scroll_height = self.driver.execute_script("return document.body.scrollHeight")
-        random_position = random.randint(5, scroll_height>>2 + 1)
+        random_position = random.randint(scroll_height>>1, scroll_height)
+        if self.debug:
+            print(f"Simulate random page scrolling, target position: {random_position}")
         self.driver.execute_script(f"window.scrollTo(0, {random_position});")
         self._human_delay(1, 5)
-
-    def _random_click(self):
-        '''Simulate random click on a blank area of the page'''
-        if self.debug:
-            print("Simulate random click on a blank area of the page")
-        window_size = self.driver.get_window_size()
-        x = random.randint(0, window_size['width'] - 100)
-        y = random.randint(0, window_size['height'] - 100)
-        try:
-            actions = ActionChains(self.driver)
-            actions.move_by_offset(x, y).click().perform()
-            self._human_delay(1, 5)
-            # Reset mouse position
-            actions.move_by_offset(-x, -y).perform()
-        except Exception:
-            pass  # Ignore exceptions from failed clicks
 
     def _random_typing(self, element, text):
         '''Simulate random keyboard typing'''
@@ -260,196 +293,210 @@ class StockBase:
             element.send_keys(char)
             time.sleep(random.uniform(0.05, 0.3))  # Random delay between each character
 
-    @retry(wait_random_min=1000, wait_random_max=5000, stop_max_attempt_number=3)
     def _get_valuation(self, ticker, exchange, statistics, update=False):
-
-        # Compose a unique ID for database table and file name
-        unique_id = f"{ticker}_{exchange}_{statistics}".replace(' ', '_').lower()
-
-        # Not force to update, check database first
-        if not update:
-            df = self._check_database(unique_id)
-            if df is not None:
-                return df
-
-        # Fetch data from website starts here
-        url = f"https://www.morningstar.com/stocks/{exchange}/{ticker}/valuation"
-        self.driver.get(url)
-
-        # Simulate human-like operations
-        self._random_mouse_move()
-        self._human_delay()
-        self._random_scroll()
-
-        statistics_button = WebDriverWait(self.driver, 30).until(
-            EC.visibility_of_element_located((By.XPATH, f"//button[contains(., '{statistics}')]"))
+        
+        @retry(
+            wait=wait_random(min=60, max=120),
+            stop=stop_after_attempt(3),
+            before_sleep=self.reset_driver
         )
-        statistics_button.click()
+        def _get_valuation_retry():
+            # Compose a unique ID for database table and file name
+            unique_id = f"{ticker}_{exchange}_{statistics}".replace(' ', '_').lower()
 
-        # More human-like operations
-        self._random_click()
-        self._human_delay()
-        self._random_scroll()
+            # Not force to update, check database first
+            if not update:
+                df = self._check_database(unique_id)
+                if df is not None:
+                    return df
 
-        export_button = WebDriverWait(self.driver, 30).until(
-            EC.visibility_of_element_located((By.XPATH, "//button[contains(., 'Export Data')]"))
-        )
-
-        # Check if there is no such data available
-        try:
-            WebDriverWait(self.driver, 5).until(
-                EC.visibility_of_element_located(
-                    (By.XPATH, f"//div[contains(., 'There is no {statistics} data available.')]")
-                )
+            # Fetch data from website starts here
+            url = f"https://www.morningstar.com/stocks/{exchange}/{ticker}/valuation"
+            self.driver.get(url)
+    
+            # Simulate human-like operations
+            self._random_mouse_move()
+            self._human_delay()
+            self._random_scroll()
+    
+            statistics_button = WebDriverWait(self.driver, 30).until(
+                EC.visibility_of_element_located((By.XPATH, f"//button[contains(., '{statistics}')]"))
             )
-            return None
-        except TimeoutException:
-            export_button.click()
-
-        # Wait for download to complete
-        tmp_string = statistics_filename[statistics]
-        tmp_file = self.download_dir + f"/{tmp_string}.xls"
-
-        retries = 5
-        while retries and (not os.path.exists(tmp_file) or os.path.getsize(tmp_file) == 0):
+            statistics_button.click()
+    
+            # More human-like operations
+            self._human_delay()
+            self._random_scroll()
+    
+            export_button = WebDriverWait(self.driver, 30).until(
+                EC.visibility_of_element_located((By.XPATH, "//button[contains(., 'Export Data')]"))
+            )
+    
+            # Check if there is no such data available
+            try:
+                WebDriverWait(self.driver, 5).until(
+                    EC.visibility_of_element_located(
+                        (By.XPATH, f"//div[contains(., 'There is no {statistics} data available.')]")
+                    )
+                )
+                return None
+            except TimeoutException:
+                export_button.click()
+    
+            # Wait for download to complete
+            tmp_string = statistics_filename[statistics]
+            tmp_file = self.download_dir + f"/{tmp_string}.xls"
+    
+            retries = 10
+            while retries and (not os.path.exists(tmp_file) or os.path.getsize(tmp_file) == 0):
+                time.sleep(1)
+                retries = retries - 1
+    
+            if 0 == retries and (not os.path.exists(tmp_file)):
+                raise ValueError("Export data fail")
+    
+            statistics_file = self.download_dir + f"/{unique_id}.xls"
+            os.rename(tmp_file, statistics_file)
             time.sleep(1)
-            retries = retries - 1
+    
+            # Update database
+            df = pd.read_excel(statistics_file)
+            self._update_database(unique_id, df)
+    
+            return df
 
-        if 0 == retries and (not os.path.exists(tmp_file)):
-            raise ValueError("Export data fail")
-
-        statistics_file = self.download_dir + f"/{unique_id}.xls"
-        os.rename(tmp_file, statistics_file)
-        time.sleep(1)
-
-        # Update database
-        df = pd.read_excel(statistics_file)
-        self._update_database(unique_id, df)
-
-        return df
-
-    @retry(wait_random_min=1000, wait_random_max=5000, stop_max_attempt_number=3)
+        return _get_valuation_retry()
+    
     def _get_financials(self, ticker, exchange, statement, period='Annual', stage='Restated', update=False):
 
-        # Compose a unique ID for database table and file name
-        unique_id = f"{ticker}_{exchange}_{statement}_{period}_{stage}".replace(' ', '_').lower()
-
-        # Not force to update, check database first
-        if not update:
-            df = self._check_database(unique_id)
-            if df is not None:
-                return df
-
-        # Fetch data from website starts here
-        url = f"https://www.morningstar.com/stocks/{exchange}/{ticker}/financials"
-        self.driver.get(url)
-
-        # Simulate human-like operations
-        self._random_mouse_move()
-        self._human_delay()
-        self._random_scroll()
-
-        # Select statement type
-        type_button = WebDriverWait(self.driver, 30).until(
-            EC.visibility_of_element_located((By.XPATH, f"//button[contains(., '{statement}')]"))
+        @retry(
+            wait=wait_random(min=60, max=120),
+            stop=stop_after_attempt(3),
+            before_sleep=self.reset_driver
         )
-        type_button.click()
-
-        # More human-like operations
-        self._random_click()
-        self._human_delay()
-        self._random_scroll()
-
-        # Select statement period
-        period_list_button = WebDriverWait(self.driver, 30).until(
-            EC.visibility_of_element_located((By.XPATH, "//button[contains(., 'Annual') and @aria-haspopup='true']"))
-        )
-        try:
-            period_list_button.click()
+        def _get_financials_retry():
+            # Compose a unique ID for database table and file name
+            unique_id = f"{ticker}_{exchange}_{statement}_{period}_{stage}".replace(' ', '_').lower()
+    
+            # Not force to update, check database first
+            if not update:
+                df = self._check_database(unique_id)
+                if df is not None:
+                    return df
+    
+            # Fetch data from website starts here
+            url = f"https://www.morningstar.com/stocks/{exchange}/{ticker}/financials"
+            self.driver.get(url)
+    
+            # Simulate human-like operations
+            self._random_mouse_move()
             self._human_delay()
-        except ElementClickInterceptedException:
-            pass
-
-        if 'Annual' == period:
-            period_button = WebDriverWait(self.driver, 30).until(
-                EC.visibility_of_element_located((By.XPATH, "//span[contains(., 'Annual') and @class='mds-list-group__item-text__sal']"))
+            self._random_scroll()
+    
+            # Select statement type
+            type_button = WebDriverWait(self.driver, 30).until(
+                EC.visibility_of_element_located((By.XPATH, f"//button[contains(., '{statement}')]"))
             )
-        else:
-            period_button = WebDriverWait(self.driver, 30).until(
-                EC.visibility_of_element_located((By.XPATH, "//span[contains(., 'Quarterly') and @class='mds-list-group__item-text__sal']"))
-            )
-
-        try:
-            period_button.click()
+            type_button.click()
+    
+            # More human-like operations
+            self._random_scroll()
             self._human_delay()
-        except ElementClickInterceptedException:
-            pass
-
-        # Select statement stage
-        stage_list_button = WebDriverWait(self.driver, 30).until(
-            EC.visibility_of_element_located((By.XPATH, "//button[contains(., 'As Originally Reported') and @aria-haspopup='true']"))
-        )
-        try:
-            stage_list_button.click()
-            self._human_delay()
-        except ElementClickInterceptedException:
-            pass
-        except ElementNotInteractableException:
-            pass
-
-        if 'As Originally Reported' == stage:
-            stage_button = WebDriverWait(self.driver, 30).until(
-                EC.visibility_of_element_located((By.XPATH, "//span[contains(., 'As Originally Reported') and @class='mds-list-group__item-text__sal']"))
+            self._random_mouse_move()
+    
+            # Select statement period
+            period_list_button = WebDriverWait(self.driver, 30).until(
+                EC.visibility_of_element_located((By.XPATH, "//button[contains(., 'Annual') and @aria-haspopup='true']"))
             )
-        else:
-            stage_button = WebDriverWait(self.driver, 30).until(
-                EC.visibility_of_element_located((By.XPATH, "//span[contains(., 'Restated') and @class='mds-list-group__item-text__sal']"))
+            try:
+                period_list_button.click()
+                self._human_delay()
+            except ElementClickInterceptedException:
+                pass
+    
+            if 'Annual' == period:
+                period_button = WebDriverWait(self.driver, 30).until(
+                    EC.visibility_of_element_located((By.XPATH, "//span[contains(., 'Annual') and @class='mds-list-group__item-text__sal']"))
+                )
+            else:
+                period_button = WebDriverWait(self.driver, 30).until(
+                    EC.visibility_of_element_located((By.XPATH, "//span[contains(., 'Quarterly') and @class='mds-list-group__item-text__sal']"))
+                )
+    
+            try:
+                period_button.click()
+                self._human_delay()
+            except ElementClickInterceptedException:
+                pass
+    
+            # Select statement stage
+            stage_list_button = WebDriverWait(self.driver, 30).until(
+                EC.visibility_of_element_located((By.XPATH, "//button[contains(., 'As Originally Reported') and @aria-haspopup='true']"))
             )
-
-        try:
-            stage_button.click()
+            try:
+                stage_list_button.click()
+                self._human_delay()
+            except ElementClickInterceptedException:
+                pass
+            except ElementNotInteractableException:
+                pass
+    
+            if 'As Originally Reported' == stage:
+                stage_button = WebDriverWait(self.driver, 30).until(
+                    EC.visibility_of_element_located((By.XPATH, "//span[contains(., 'As Originally Reported') and @class='mds-list-group__item-text__sal']"))
+                )
+            else:
+                stage_button = WebDriverWait(self.driver, 30).until(
+                    EC.visibility_of_element_located((By.XPATH, "//span[contains(., 'Restated') and @class='mds-list-group__item-text__sal']"))
+                )
+    
+            try:
+                stage_button.click()
+                self._human_delay()
+            except ElementClickInterceptedException:
+                pass
+            except ElementNotInteractableException:
+                pass
+    
+            # Expand the detail page
+            expand_detail_view = WebDriverWait(self.driver, 30).until(
+                EC.visibility_of_element_located((By.XPATH, "//span[contains(., 'Expand Detail View')]"))
+            )
+            expand_detail_view.click()
+    
+            # More human-like operations
+            self._random_mouse_move()
             self._human_delay()
-        except ElementClickInterceptedException:
-            pass
-        except ElementNotInteractableException:
-            pass
-
-        # Expand the detail page
-        expand_detail_view = WebDriverWait(self.driver, 30).until(
-            EC.visibility_of_element_located((By.XPATH, "//span[contains(., 'Expand Detail View')]"))
-        )
-        expand_detail_view.click()
-
-        # More human-like operations
-        self._random_mouse_move()
-        self._human_delay()
-        self._random_scroll()
-
-        export_button = WebDriverWait(self.driver, 30).until(
-            EC.visibility_of_element_located((By.XPATH, "//button[contains(., 'Export Data')]"))
-        )
-        export_button.click()
-
-        retries = 5
-        # Wait for download to complete
-        tmp_file = self.download_dir + f"/{statement}_{period}_{stage}.xls"
-        while retries and (not os.path.exists(tmp_file)):
+            self._random_scroll()
+    
+            export_button = WebDriverWait(self.driver, 30).until(
+                EC.visibility_of_element_located((By.XPATH, "//button[contains(., 'Export Data')]"))
+            )
+            export_button.click()
+    
+            retries = 5
+            # Wait for download to complete
+            tmp_file = self.download_dir + f"/{statement}_{period}_{stage}.xls"
+            while retries and (not os.path.exists(tmp_file)):
+                time.sleep(1)
+                retries = retries - 1
+    
+            if 0 == retries and (not os.path.exists(tmp_file)):
+                raise ValueError("Export data fail")
+    
+            statement_file = self.download_dir + f"/{unique_id}.xls"
+            os.rename(tmp_file, statement_file)
             time.sleep(1)
-            retries = retries - 1
-
-        if 0 == retries and (not os.path.exists(tmp_file)):
-            raise ValueError("Export data fail")
-
-        statement_file = self.download_dir + f"/{unique_id}.xls"
-        os.rename(tmp_file, statement_file)
-        time.sleep(1)
-
-        # Update database
-        df = pd.read_excel(statement_file)
-        self._update_database(unique_id, df)
-
-        return df
-
+    
+            # Update database
+            df = pd.read_excel(statement_file)
+            self._update_database(unique_id, df)
+    
+            return df
+        
+        return _get_financials_retry()
+    
+    
     def _get_us_exchange_tickers(self, exchange, update=False):
 
         unique_id = f"us_exchange_{exchange}_tickers"
@@ -478,12 +525,13 @@ class StockBase:
         symbols = df['symbol'].tolist()
         return symbols
 
-    def initialize_driver(self):
+    def initialize_chrome_driver(self):
         # Initialize the driver based on the driver_type
         if self.driver_type == 'uc':
             self.driver = uc.Chrome(
                 version_main=126,
-                use_subprocess=False,
+                use_subprocess=True,
+                user_multi_procs=True,
                 service=webdriver.ChromeService(ChromeDriverManager(driver_version='126').install()),
                 options=self.options)
         elif self.driver_type == 'stealth':
@@ -715,6 +763,20 @@ class Stock(StockBase):
         return self._get_us_exchange_tickers(exchange)
 
 # End of class Stock
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 

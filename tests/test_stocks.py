@@ -19,13 +19,13 @@ def test_stocks():
     if 'true' == os.getenv('GITHUB_ACTIONS'):
         stock = stocks.Stock(
             debug=False,
-            session=session,
+            database=session,
             proxy=None,
         )
     else:
         stock = stocks.Stock(
             debug=False,
-            session=session,
+            database=session,
             proxy=proxy,
         )
 
