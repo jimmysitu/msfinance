@@ -28,10 +28,10 @@ jobs:
     - name: Setup Chrome
       uses: browser-actions/setup-chrome@v1.7.2
       with:
-        chrome-version: stable
-    - name: Set chrome in path
+        chrome-version: 126
+    - name: Set Chrome in path
       run: | 
-        echo "/opt/hostedtoolcache/chromium/stable/x64" >> $GITHUB_PATH
+        echo "/opt/hostedtoolcache/setup-chrome/chromium/stable/x64" >> $GITHUB_PATH
     - name: Set up Python ${{ matrix.python-version }}
       uses: actions/setup-python@v3
       with:
