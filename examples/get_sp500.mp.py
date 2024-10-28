@@ -10,7 +10,7 @@ import logging
 proxy = 'socks5://127.0.0.1:1088'
 
 # Create an engine
-engine = create_engine('sqlite:///sp500.mt.db3', pool_size=5, max_overflow=10)
+engine = create_engine('sqlite:///sp500.mp.db3', pool_size=5, max_overflow=10)
 
 # Create a session factory
 InitialSessionFactory = sessionmaker(bind=engine)
@@ -22,6 +22,7 @@ initial_stock = msf.Stock(
 )
 
 sp500_tickers = initial_stock.get_sp500_tickers()
+sp500_tickers = sorted(sp500_tickers)
 
 tickers_list = {}
 tickers_list['xnas'] = initial_stock.get_xnas_tickers()
@@ -70,7 +71,7 @@ def initializer():
 
 # Use ProcessPoolExecutor to process tickers in parallel
 max_workers = 4  # Adjust max_workers as needed
-chunk_size = math.ceil(len(sp500_tickers) / max_workers)
+chunk_size = 50
 ticker_chunks = [sp500_tickers[i:i + chunk_size] for i in range(0, len(sp500_tickers), chunk_size)]
 
 with ProcessPoolExecutor(max_workers=max_workers, initializer=initializer) as executor:

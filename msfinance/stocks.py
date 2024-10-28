@@ -110,16 +110,13 @@ class StockBase:
             
             print(f"  Time elapsed: {retry_state.seconds_since_start}")
         
-        if self.driver:
+
+        # Setup a new driver instance
+        if isinstance(self.driver, (webdriver.Chrome, uc.Chrome)):
             self.driver.quit()
-    
-        # Assuming the driver is a Chrome or Firefox driver
-        # You might need to adjust this logic based on your actual driver setup
-        if isinstance(self.driver, webdriver.Chrome):
-            self.setup_chrome_driver(self.proxies['http'])
-        elif isinstance(self.driver, uc.Chrome):
             self.setup_chrome_driver(self.proxies['http'])
         else:
+            self.driver.quit()
             self.setup_firefox_driver(self.proxies['http'])
 
 
@@ -529,6 +526,7 @@ class StockBase:
         # Initialize the driver based on the driver_type
         if self.driver_type == 'uc':
             self.driver = uc.Chrome(
+                debug=self.debug,
                 version_main=126,
                 use_subprocess=True,
                 user_multi_procs=True,
@@ -763,6 +761,7 @@ class Stock(StockBase):
         return self._get_us_exchange_tickers(exchange)
 
 # End of class Stock
+
 
 
 
