@@ -30,9 +30,10 @@ jobs:
       uses: browser-actions/setup-chrome@v1.7.2
       with:
         chrome-version: 126
-    - name: Set Chrome in path
+    - name: Set Chrome directory in path
       run: | 
-        echo "${{ steps.setup_chrome.outputs.chrome-path }}" >> $GITHUB_PATH
+        CHROME_DIR=$(dirname "${{ steps.setup_chrome.outputs.chrome-path }}")
+        echo "$CHROME_DIR" >> $GITHUB_PATH
     - name: Set up Python ${{ matrix.python-version }}
       uses: actions/setup-python@v3
       with:
