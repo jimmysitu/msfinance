@@ -32,7 +32,7 @@ jobs:
         chrome-version: 126
     - name: Set Chrome in path
       run: | 
-        echo "${{ steps.setup_chrome.outputs.chrome_path }}" >> $GITHUB_PATH
+        echo "${{ steps.setup_chrome.outputs.chrome-path }}" >> $GITHUB_PATH
     - name: Set up Python ${{ matrix.python-version }}
       uses: actions/setup-python@v3
       with:
