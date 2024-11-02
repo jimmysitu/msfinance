@@ -23,7 +23,7 @@ logging.basicConfig(level=logging.DEBUG, format='%(asctime)s - %(levelname)s - %
 # So let user_multi_procs to be False here to initialize the driver environment
 nouse_driver = uc.Chrome(
     version_main=126,
-    use_subprocess=True,
+    use_subprocess=False,
     user_multi_procs=False,
     service=webdriver.ChromeService(ChromeDriverManager(driver_version='126').install()),
 )
