@@ -7,8 +7,26 @@ import os
 import logging
 import pandas as pd
 
+from selenium import webdriver
+import undetected_chromedriver as uc
+
+# For Chrome driver
+from webdriver_manager.chrome import ChromeDriverManager
+
+# For Firefox driver
+from webdriver_manager.firefox import GeckoDriverManager
+
 # Configure logging
 logging.basicConfig(level=logging.DEBUG, format='%(asctime)s - %(levelname)s - %(message)s')
+
+# It seems that undetected_chromedriver is not working properly, when user_multi_procs is set to True
+# So let user_multi_procs to be False here to initialize the driver environment
+nouse_driver = uc.Chrome(
+    version_main=126,
+    use_subprocess=True,
+    user_multi_procs=False,
+    service=webdriver.ChromeService(ChromeDriverManager(driver_version='126').install()),
+)
 
 def test_stocks():
     logging.info("Starting test_stocks")

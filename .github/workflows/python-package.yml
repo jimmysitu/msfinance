@@ -33,6 +33,7 @@ jobs:
     - name: Set Chrome directory in path
       run: | 
         CHROME_DIR=$(dirname "${{ steps.setup_chrome.outputs.chrome-path }}")
+        echo "CHROME_DIR: $CHROME_DIR"
         echo "$CHROME_DIR" >> $GITHUB_PATH
     - name: Set up Python ${{ matrix.python-version }}
       uses: actions/setup-python@v3

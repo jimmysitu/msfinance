@@ -42,6 +42,7 @@ def process_tickers(tickers, proxy):
         proxy=proxy,
     )
 
+
     logging.info(f"Processing tickers: {tickers}")
     
     results = []
@@ -61,17 +62,18 @@ def process_tickers(tickers, proxy):
 
         results.append((f"Ticker: {ticker}", valuations, financials))
 
+    stock.driver.quit()
     return results
 # End of process_tickers
 
 def initializer():
     """ensure the parent proc's database connections are not touched
     in the new connection pool"""
-    engine.dispose(close=False)
+    engine.dispose(close=False
 
-# Use ProcessPoolExecutor to process tickers in parallel
+# Use ProcessPoolExecutor to process tickers i parallel
 max_workers = 4  # Adjust max_workers as needed
-chunk_size = 50
+chunk_size = 8
 ticker_chunks = [sp500_tickers[i:i + chunk_size] for i in range(0, len(sp500_tickers), chunk_size)]
 
 with ProcessPoolExecutor(max_workers=max_workers, initializer=initializer) as executor:
