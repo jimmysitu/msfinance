@@ -69,9 +69,9 @@ def process_tickers(tickers, proxy):
 def initializer():
     """ensure the parent proc's database connections are not touched
     in the new connection pool"""
-    engine.dispose(close=False
+    engine.dispose(close=False)
 
-# Use ProcessPoolExecutor to process tickers i parallel
+# Use ProcessPoolExecutor to process tickers in parallel
 max_workers = 4  # Adjust max_workers as needed
 chunk_size = 8
 ticker_chunks = [sp500_tickers[i:i + chunk_size] for i in range(0, len(sp500_tickers), chunk_size)]
