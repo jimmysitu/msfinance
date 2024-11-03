@@ -22,6 +22,7 @@ logging.basicConfig(level=logging.DEBUG, format='%(asctime)s - %(levelname)s - %
 # It seems that undetected_chromedriver is not working properly, when user_multi_procs is set to True
 # So let user_multi_procs to be False here to initialize the driver environment
 nouse_driver = uc.Chrome(
+    browser_executable_path=os.environ.get('CHROME_PATH'),
     headless=True,
     debug=True,
     version_main=126,
