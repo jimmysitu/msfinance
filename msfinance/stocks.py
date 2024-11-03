@@ -59,6 +59,10 @@ class StockBase:
 
         # Setup driver
         if browser == 'chrome':
+            if os.environ.get('CHROME_PATH') is not None:
+                self.chrome_path = os.environ.get('CHROME_PATH')
+            else:
+                self.chrome_path = None
             self.setup_chrome_driver(proxy)
         else:
             # Default: firefox
@@ -526,17 +530,20 @@ class StockBase:
         # Initialize the driver based on the driver_type
         if self.driver_type == 'uc':
             self.driver = uc.Chrome(
-                debug=self.debug,
+                options=self.options,
+                browser_executable_path=self.chrome_path,
                 version_main=126,
                 use_subprocess=True,
                 user_multi_procs=True,
                 service=webdriver.ChromeService(ChromeDriverManager(driver_version='126').install()),
-                options=self.options)
+                debug=self.debug,
+            )
         elif self.driver_type == 'stealth':
             # Initialize the WebDriver (e.g., Chrome)
             self.driver = webdriver.Chrome(
                 service=webdriver.ChromeService(ChromeDriverManager(driver_version='126').install()),
-                options=self.options)
+                options=self.options,
+            )
             
             # Apply selenium-stealth to the WebDriver
             stealth(self.driver,

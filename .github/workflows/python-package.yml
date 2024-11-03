@@ -30,12 +30,12 @@ jobs:
       uses: browser-actions/setup-chrome@v1.7.2
       with:
         chrome-version: 126
-    - name: Set Chrome directory in path
-      run: | 
-        CHROME_DIR=$(dirname "${{ steps.setup_chrome.outputs.chrome-path }}")
-        echo "CHROME_DIR: $CHROME_DIR"
-        echo "$CHROME_DIR" >> $GITHUB_PATH
-        cat $GITHUB_PATH
+#    - name: Set Chrome directory in path
+#      run: | 
+#        CHROME_DIR=$(dirname "${{ steps.setup_chrome.outputs.chrome-path }}")
+#        echo "CHROME_DIR: $CHROME_DIR"
+#        echo "$CHROME_DIR" >> $GITHUB_PATH
+#        cat $GITHUB_PATH
     - name: Set up Python ${{ matrix.python-version }}
       uses: actions/setup-python@v3
       with:
@@ -52,6 +52,8 @@ jobs:
         # exit-zero treats all errors as warnings. The GitHub editor is 127 chars wide
         flake8 . --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics
     - name: Test with pytest
+      env:
+        CHROME_PATH: ${{ steps.setup_chrome.outputs.chrome-path }}
       run: |
-        echo "Path: $PATH"
+        echo "Chrome path: $CHROME_PATH"
         pytest --log-cli-level=DEBUG tests/test_stocks.py
