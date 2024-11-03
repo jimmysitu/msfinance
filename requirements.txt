@@ -1,3 +1,5 @@
+xlrd
+lxml
 requests
 pandas
 tenacity
