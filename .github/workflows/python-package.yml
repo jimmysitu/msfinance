@@ -24,7 +24,7 @@ jobs:
         python-version: ["3.8", "3.9"]
 
     steps:
-    - uses: actions/checkout@v3
+    - uses: actions/checkout@v4.2.2
     - name: Setup Chrome
       id: setup_chrome
       uses: browser-actions/setup-chrome@v1.7.2
