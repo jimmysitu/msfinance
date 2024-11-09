@@ -47,6 +47,6 @@ print(stock.get_cash_flow('aapl', 'xnas'))
 - [x] Add support for pip package
 - [x] Add tickers from HK exchanges
 - [x] Add docs in docs directory for readthedoc.io
-- [ ] Add multiprocessing for speed up
-- [ ] More robust error handling
+- [x] Add multiprocessing for speed up
+- [x] More robust error handling
 - [ ] Add more statistics valuations
