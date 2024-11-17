@@ -5,6 +5,7 @@ import time
 import json
 import requests
 import tempfile
+import logging
 
 import pandas as pd
 
@@ -51,7 +52,13 @@ statistics_filename = {
 class StockBase:
     def __init__(self, debug=False, browser='chrome', database='msfinance.db3', session_factory=None, proxy=None, driver_type='uc'):
         self.debug = debug
-        
+        self.logger = logging.getLogger(self.__class__.__name__)
+        handler = logging.StreamHandler()
+        formatter = logging.Formatter('%(levelname)s:%(name)s: %(message)s')
+        handler.setFormatter(formatter)
+        self.logger.addHandler(handler)
+        self.logger.setLevel(logging.DEBUG if self.debug else logging.INFO)
+
         # Initialize UserAgent for random user-agent generation
         self.ua = UserAgent()
 
@@ -88,8 +95,7 @@ class StockBase:
         self.driver.get(url)
         time.sleep(15)
 
-        if self.debug:
-            print(f"Driver initialized")
+        self.logger.debug("Driver initialized")
 
     def __del__(self):
         if not self.debug:
@@ -99,20 +105,20 @@ class StockBase:
         '''Reset the driver'''
 
         if retry_state is not None:
-            print("Retry State Information:")
-            print(f"  Attempt number: {retry_state.attempt_number}")
+            self.logger.info("Retry State Information:")
+            self.logger.info(f"  Attempt number: {retry_state.attempt_number}")
             
             try:
-                print(f"  Last result: {retry_state.outcome.result()}")
+                self.logger.info(f"  Last result: {retry_state.outcome.result()}")
             except Exception as e:
-                print(f"  Last result: {e}")
+                self.logger.info(f"  Last result: {e}")
             
             try:
-                print(f"  Last exception: {retry_state.outcome.exception()}")
+                self.logger.info(f"  Last exception: {retry_state.outcome.exception()}")
             except Exception as e:
-                print(f"  Last exception: {e}")
+                self.logger.info(f"  Last exception: {e}")
             
-            print(f"  Time elapsed: {retry_state.seconds_since_start}")
+            self.logger.info(f"  Time elapsed: {retry_state.seconds_since_start}")
         
 
         # Setup a new driver instance
@@ -133,8 +139,7 @@ class StockBase:
 
         # Setting download directory
         self.download_dir = os.path.join(tempfile.gettempdir(), 'msfinance', str(os.getpid()))
-        if self.debug:
-            print(f"Download directory: {self.download_dir}")
+        self.logger.debug(f"Download directory: {self.download_dir}")
 
         if not os.path.exists(self.download_dir):
             os.makedirs(self.download_dir)
@@ -151,7 +156,7 @@ class StockBase:
             if 'socks5' == protocol:
                 self.options.add_argument(f'--proxy-server=socks5://{host}:{port}')
             else:
-                print("No supported proxy protocol")
+                self.logger.error("No supported proxy protocol")
                 exit(1)
 
         # Initialize the undetected_chromedriver
@@ -178,8 +183,7 @@ class StockBase:
 
         # Setting download directory
         self.download_dir = os.path.join(tempfile.gettempdir(), 'msfinance', str(os.getpid()))
-        if self.debug:
-            print(f"Download directory: {self.download_dir}")
+        self.logger.debug(f"Download directory: {self.download_dir}")
 
         if not os.path.exists(self.download_dir):
             os.makedirs(self.download_dir)
@@ -212,7 +216,7 @@ class StockBase:
                 self.options.set_preference('network.proxy.socks_version', 5)
                 self.options.set_preference('network.proxy.socks_remote_dns', True)
             else:
-                print("No supported proxy protocol")
+                self.logger.error("No supported proxy protocol")
                 exit(1)
 
         self.driver = webdriver.Firefox(
@@ -235,8 +239,7 @@ class StockBase:
             df = pd.read_sql_query(query, session.bind)
             return df
         except sqlalchemy.exc.OperationalError as e:
-            # Log the error or handle it as needed
-            print(f"OperationalError: {e}")
+            self.logger.info(f"OperationalError: {e}")
             return None
         finally:
             session.close()
@@ -272,7 +275,7 @@ class StockBase:
         target_x = random.randint(100, 200)
         target_y = random.randint(100, 200)
         if self.debug:
-            print(f"Simulate random mouse movement, target position: {target_x}, {target_y}")
+            self.logger.debug(f"Simulate random mouse movement, target position: {target_x}, {target_y}")
         actions.move_to_element_with_offset(element, target_x, target_y).perform()
         self._human_delay(1, 5)
         
@@ -281,15 +284,13 @@ class StockBase:
         
         scroll_height = self.driver.execute_script("return document.body.scrollHeight")
         random_position = random.randint(scroll_height>>1, scroll_height)
-        if self.debug:
-            print(f"Simulate random page scrolling, target position: {random_position}")
+        self.logger.debug(f"Simulate random page scrolling, target position: {random_position}")
         self.driver.execute_script(f"window.scrollTo(0, {random_position});")
         self._human_delay(1, 5)
 
     def _random_typing(self, element, text):
         '''Simulate random keyboard typing'''
-        if self.debug:
-            print(f"Simulate random keyboard typing: {text}")
+        self.logger.debug(f"Simulate random keyboard typing: {text}")
         for char in text:
             element.send_keys(char)
             time.sleep(random.uniform(0.05, 0.3))  # Random delay between each character

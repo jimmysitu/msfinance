@@ -16,7 +16,7 @@ engine = create_engine('sqlite:///sp500.mp.db3', pool_size=5, max_overflow=10)
 InitialSessionFactory = sessionmaker(bind=engine)
 # Fetch tickers outside the process pool
 initial_stock = msf.Stock(
-    debug=False, 
+    debug=False,
     session_factory=InitialSessionFactory,
     proxy=proxy,
 )
@@ -37,25 +37,25 @@ def process_tickers(tickers, proxy):
     SessionFactory = sessionmaker(bind=engine)
     # Create a Stock instance using the session
     stock = msf.Stock(
-        debug=True, 
+        debug=True,
         session_factory=SessionFactory,
         proxy=proxy,
     )
 
 
     logging.info(f"Processing tickers: {tickers}")
-    
+
     results = []
     for ticker in tickers:
         if ticker in tickers_list['xnas']:
             valuations = stock.get_valuations(ticker, 'xnas')
-            financials = stock.get_financials(ticker, 'xnas')
+            financials = stock.get_financials(ticker, 'xnas', stage='Restated')
         elif ticker in tickers_list['xnys']:
             valuations = stock.get_valuations(ticker, 'xnys')
-            financials = stock.get_financials(ticker, 'xnys')
+            financials = stock.get_financials(ticker, 'xnys', stage='Restated')
         elif ticker in tickers_list['xase']:
             valuations = stock.get_valuations(ticker, 'xase')
-            financials = stock.get_financials(ticker, 'xase')
+            financials = stock.get_financials(ticker, 'xase', stage='Restated')
         else:
             results.append((f"Ticker: {ticker} is not found in any exchange", None, None))
             continue
