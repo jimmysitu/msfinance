@@ -24,7 +24,7 @@ dependencies = [
     "tenacity",
     "selenium",
     "sqlalchemy",
-    "fake-useragent",
+    "fake-useragent<2.0.0",
     "selenium-stealth",
     "undetected-chromedriver",
     "webdriver-manager"
