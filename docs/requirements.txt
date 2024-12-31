@@ -58,4 +58,4 @@ sphinxcontrib-serializinghtml==1.1.5
     # via sphinx
 urllib3==1.26.9
     # via requests
-setuptools<=71.0.0
+setuptools==68.0.0
