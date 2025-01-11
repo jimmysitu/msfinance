@@ -76,8 +76,9 @@ def test_stocks():
     stock.get_balance_sheet_statement('aapl', 'xnas', stage=stage)
     stock.get_cash_flow_statement('aapl', 'xnas', stage=stage)
 
+    stock.get_financial_summary('aapl', 'xnas')
     stock.get_growth('aapl', 'xnas')
-    stock.get_operating_and_efficiency('aapl', 'xnas')
+    stock.get_profitability_and_efficiency('aapl', 'xnas')
     stock.get_financial_health('aapl', 'xnas')
     stock.get_cash_flow('aapl', 'xnas')
 
@@ -97,7 +98,7 @@ def test_stocks():
         df = pd.read_sql_query(query, db)
         assert df is not None, f"{query} is not found in database"
 
-    for statistics in ['growth', 'operating_and_efficiency', 'financial_health', 'cash_flow']:
+    for statistics in ['financial_summary', 'growth', 'profitability_and_efficiency', 'financial_health', 'cash_flow']:
         query = f"SELECT * FROM aapl_xnas_{statistics}"
         logging.debug(f"Executing query: {query}")
         df = pd.read_sql_query(query, db)

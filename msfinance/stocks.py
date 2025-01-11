@@ -574,8 +574,22 @@ class StockBase:
 
 class Stock(StockBase):
     '''
-    Get stock financials statements and valuations statistics
+    Get stock financials statements and key metrics statistics
     '''
+    def get_financial_summary(self, ticker, exchange, update=False):
+        '''
+        Get financial summary statistics of stock
+
+        Args:
+            ticker: Stock symbol
+            exchange: Exchange name
+            update: Force update data from website
+        Returns:
+            DataFrame of statistics
+        '''
+        statistics = 'Financial Summary'
+        return self._get_key_metrics(ticker, exchange, statistics, update)
+
     def get_growth(self, ticker, exchange, update=False):
         '''
         Get growth statistics of stock
@@ -590,9 +604,9 @@ class Stock(StockBase):
         statistics = 'Growth'
         return self._get_key_metrics(ticker, exchange, statistics, update)
 
-    def get_operating_and_efficiency(self, ticker, exchange, update=False):
+    def get_profitability_and_efficiency(self, ticker, exchange, update=False):
         '''
-        Get operating and efficiency statistics of stock
+        Get profitability and efficiency statistics of stock
 
         Args:
             ticker: Stock symbol
@@ -600,7 +614,7 @@ class Stock(StockBase):
         Returns:
             DataFrame of statistics
         '''
-        statistics = 'Operating and Efficiency'
+        statistics = 'Profitability and Efficiency'
         return self._get_key_metrics(ticker, exchange, statistics, update)
 
     def get_financial_health(self, ticker, exchange, update=False):
