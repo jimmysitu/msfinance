@@ -23,11 +23,11 @@ tickers_list = {
 
 for ticker in sorted(tickers_list):
 
-    valuations = stock.get_valuations(ticker, 'xtai')
+    key_metrics = stock.get_key_metrics(ticker, 'xtai')
     financials = stock.get_financials(ticker, 'xtai')
 
     print(f"Ticker: {ticker}")
-    for valuation in valuations:
-        print(valuation)
+    for key_metric in key_metrics:
+        print(key_metric)
     for financial in financials:
         print(financial)

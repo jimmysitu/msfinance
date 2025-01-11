@@ -6,6 +6,7 @@ import json
 import requests
 import tempfile
 import logging
+import glob
 
 import pandas as pd
 
@@ -42,8 +43,9 @@ from webdriver_manager.firefox import GeckoDriverManager
 
 # Mapping statistics string to statistics file name
 statistics_filename = {
+    'Financial Summary':            'summary',
     'Growth':                       'growthTable',
-    'Operating and Efficiency':     'operatingAndEfficiency',
+    'Profitability and Efficiency': 'profitabilityAndEfficiency',
     'Financial Health':             'financialHealth',
     'Cash Flow':                    'cashFlow',
 }
@@ -295,14 +297,14 @@ class StockBase:
             element.send_keys(char)
             time.sleep(random.uniform(0.05, 0.3))  # Random delay between each character
 
-    def _get_valuation(self, ticker, exchange, statistics, update=False):
+    def _get_key_metrics(self, ticker, exchange, statistics, update=False):
         
         @retry(
             wait=wait_random(min=60, max=120),
             stop=stop_after_attempt(3),
             before_sleep=self.reset_driver
         )
-        def _get_valuation_retry():
+        def _get_key_metrics_retry():
             # Compose a unique ID for database table and file name
             unique_id = f"{ticker}_{exchange}_{statistics}".replace(' ', '_').lower()
 
@@ -313,7 +315,7 @@ class StockBase:
                     return df
 
             # Fetch data from website starts here
-            url = f"https://www.morningstar.com/stocks/{exchange}/{ticker}/valuation"
+            url = f"https://www.morningstar.com/stocks/{exchange}/{ticker}/key-metrics"
             self.driver.get(url)
     
             # Simulate human-like operations
@@ -325,13 +327,13 @@ class StockBase:
                 EC.visibility_of_element_located((By.XPATH, f"//button[contains(., '{statistics}')]"))
             )
             statistics_button.click()
-    
+            
             # More human-like operations
             self._human_delay()
             self._random_scroll()
     
             export_button = WebDriverWait(self.driver, 30).until(
-                EC.visibility_of_element_located((By.XPATH, "//button[contains(., 'Export Data')]"))
+                EC.visibility_of_element_located((By.XPATH, '//*[@id="salKeyStatsPopoverExport"]'))
             )
     
             # Check if there is no such data available
@@ -347,16 +349,21 @@ class StockBase:
     
             # Wait for download to complete
             tmp_string = statistics_filename[statistics]
-            tmp_file = self.download_dir + f"/{tmp_string}.xls"
+
+            # Use wildcard to match the file name
+            pattern = os.path.join(self.download_dir, f"{tmp_string}*.xls")
     
             retries = 10
-            while retries and (not os.path.exists(tmp_file) or os.path.getsize(tmp_file) == 0):
+            downloaded_files = glob.glob(pattern)
+            while retries and (not downloaded_files or os.path.getsize(downloaded_files[0]) == 0):
                 time.sleep(1)
-                retries = retries - 1
+                retries -= 1
+                downloaded_files = glob.glob(pattern)
     
-            if 0 == retries and (not os.path.exists(tmp_file)):
+            if not downloaded_files:
                 raise ValueError("Export data fail")
     
+            tmp_file = downloaded_files[0]
             statistics_file = self.download_dir + f"/{unique_id}.xls"
             os.rename(tmp_file, statistics_file)
             time.sleep(1)
@@ -367,7 +374,7 @@ class StockBase:
     
             return df
 
-        return _get_valuation_retry()
+        return _get_key_metrics_retry()
     
     def _get_financials(self, ticker, exchange, statement, period='Annual', stage='Restated', update=False):
 
@@ -418,11 +425,11 @@ class StockBase:
     
             if 'Annual' == period:
                 period_button = WebDriverWait(self.driver, 30).until(
-                    EC.visibility_of_element_located((By.XPATH, "//span[contains(., 'Annual') and @class='mds-list-group__item-text__sal']"))
+                    EC.visibility_of_element_located((By.XPATH, "//span[contains(., 'Annual') and @class='mds-list-group-item__text__sal']"))
                 )
             else:
                 period_button = WebDriverWait(self.driver, 30).until(
-                    EC.visibility_of_element_located((By.XPATH, "//span[contains(., 'Quarterly') and @class='mds-list-group__item-text__sal']"))
+                    EC.visibility_of_element_located((By.XPATH, "//span[contains(., 'Quarterly') and @class='mds-list-group-item__text__sal']"))
                 )
     
             try:
@@ -445,11 +452,13 @@ class StockBase:
     
             if 'As Originally Reported' == stage:
                 stage_button = WebDriverWait(self.driver, 30).until(
-                    EC.visibility_of_element_located((By.XPATH, "//span[contains(., 'As Originally Reported') and @class='mds-list-group__item-text__sal']"))
+                    EC.visibility_of_element_located(
+                        (By.XPATH, "//span[contains(., 'As Originally Reported') and @class='mds-list-group-item__text__sal']"))
                 )
             else:
                 stage_button = WebDriverWait(self.driver, 30).until(
-                    EC.visibility_of_element_located((By.XPATH, "//span[contains(., 'Restated') and @class='mds-list-group__item-text__sal']"))
+                    EC.visibility_of_element_located(
+                        (By.XPATH, "//span[contains(., 'Restated') and @class='mds-list-group-item__text__sal']"))
                 )
     
             try:
@@ -460,19 +469,13 @@ class StockBase:
             except ElementNotInteractableException:
                 pass
     
-            # Expand the detail page
-            expand_detail_view = WebDriverWait(self.driver, 30).until(
-                EC.visibility_of_element_located((By.XPATH, "//span[contains(., 'Expand Detail View')]"))
-            )
-            expand_detail_view.click()
-    
             # More human-like operations
             self._random_mouse_move()
             self._human_delay()
             self._random_scroll()
-    
+
             export_button = WebDriverWait(self.driver, 30).until(
-                EC.visibility_of_element_located((By.XPATH, "//button[contains(., 'Export Data')]"))
+                EC.visibility_of_element_located((By.XPATH, '//*[@id="salEqsvFinancialsPopoverExport"]'))
             )
             export_button.click()
     
@@ -585,7 +588,7 @@ class Stock(StockBase):
             DataFrame of statistics
         '''
         statistics = 'Growth'
-        return self._get_valuation(ticker, exchange, statistics, update)
+        return self._get_key_metrics(ticker, exchange, statistics, update)
 
     def get_operating_and_efficiency(self, ticker, exchange, update=False):
         '''
@@ -598,7 +601,7 @@ class Stock(StockBase):
             DataFrame of statistics
         '''
         statistics = 'Operating and Efficiency'
-        return self._get_valuation(ticker, exchange, statistics, update)
+        return self._get_key_metrics(ticker, exchange, statistics, update)
 
     def get_financial_health(self, ticker, exchange, update=False):
         '''
@@ -611,7 +614,7 @@ class Stock(StockBase):
             DataFrame of statistics
         '''
         statistics = 'Financial Health'
-        return self._get_valuation(ticker, exchange, statistics, update)
+        return self._get_key_metrics(ticker, exchange, statistics, update)
 
     def get_cash_flow(self, ticker, exchange, update=False):
         '''
@@ -624,11 +627,11 @@ class Stock(StockBase):
             DataFrame of statistics
         '''
         statistics = 'Cash Flow'
-        return self._get_valuation(ticker, exchange, statistics, update)
+        return self._get_key_metrics(ticker, exchange, statistics, update)
 
-    def get_valuations(self, ticker, exchange, update=False):
+    def get_key_metrics(self, ticker, exchange, update=False):
         '''
-        Get all valuations of stock
+        Get all key metrics of stock
 
         Args:
             ticker: Stock symbol
@@ -637,12 +640,12 @@ class Stock(StockBase):
             DataFrame list of statistics
         '''
 
-        self.valuations = []
-        for statistics in ['Growth', 'Operating and Efficiency', 'Financial Health','Cash Flow']:
-            df = self._get_valuation(ticker, exchange, statistics, update)
-            self.valuations.append(df)
+        self.key_metrics = []
+        for statistics in ['Financial Summary', 'Growth', 'Profitability and Efficiency', 'Financial Health','Cash Flow']:
+            df = self._get_key_metrics(ticker, exchange, statistics, update)
+            self.key_metrics.append(df)
 
-        return self.valuations
+        return self.key_metrics
 
     def get_income_statement(self, ticker, exchange, period='Annual', stage='Restated', update=False):
         '''

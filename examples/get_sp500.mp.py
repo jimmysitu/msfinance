@@ -48,19 +48,19 @@ def process_tickers(tickers, proxy):
     results = []
     for ticker in tickers:
         if ticker in tickers_list['xnas']:
-            valuations = stock.get_valuations(ticker, 'xnas')
+            key_metrics = stock.get_key_metrics(ticker, 'xnas')
             financials = stock.get_financials(ticker, 'xnas', stage='Restated')
         elif ticker in tickers_list['xnys']:
-            valuations = stock.get_valuations(ticker, 'xnys')
+            key_metrics = stock.get_key_metrics(ticker, 'xnys')
             financials = stock.get_financials(ticker, 'xnys', stage='Restated')
         elif ticker in tickers_list['xase']:
-            valuations = stock.get_valuations(ticker, 'xase')
+            key_metrics = stock.get_key_metrics(ticker, 'xase')
             financials = stock.get_financials(ticker, 'xase', stage='Restated')
         else:
             results.append((f"Ticker: {ticker} is not found in any exchange", None, None))
             continue
 
-        results.append((f"Ticker: {ticker}", valuations, financials))
+        results.append((f"Ticker: {ticker}", key_metrics, financials))
 
     stock.driver.quit()
     return results
@@ -80,11 +80,11 @@ with ProcessPoolExecutor(max_workers=max_workers, initializer=initializer) as ex
     futures = {executor.submit(process_tickers, chunk, proxy): chunk for chunk in ticker_chunks}
     for future in as_completed(futures):
         results = future.result()
-        for ticker_info, valuations, financials in results:
+        for ticker_info, key_metrics, financials in results:
             print(ticker_info)
-            if valuations and financials:
-                for valuation in valuations:
-                    print(valuation)
+            if key_metrics and financials:
+                for key_metric in key_metrics:
+                    print(key_metric)
                 for financial in financials:
                     print(financial)
 

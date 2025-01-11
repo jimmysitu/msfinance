@@ -59,3 +59,4 @@ sphinxcontrib-serializinghtml==1.1.5
 urllib3==1.26.9
     # via requests
 setuptools==68.0.0
+    # via undetected-chromedriver
