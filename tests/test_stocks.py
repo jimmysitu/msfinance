@@ -98,8 +98,9 @@ def test_stocks():
         df = pd.read_sql_query(query, db)
         assert df is not None, f"{query} is not found in database"
 
+    stage = 'Restated'.replace(' ', '_').lower()
     for statistics in ['financial_summary', 'growth', 'profitability_and_efficiency', 'financial_health', 'cash_flow']:
-        query = f"SELECT * FROM aapl_xnas_{statistics}"
+        query = f"SELECT * FROM aapl_xnas_{statistics}_{stage}"
         logging.debug(f"Executing query: {query}")
         df = pd.read_sql_query(query, db)
         assert df is not None, f"{query} is not found in database"

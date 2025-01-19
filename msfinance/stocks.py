@@ -659,7 +659,7 @@ class Stock(StockBase):
     Get stock financials statements and key metrics statistics
     '''
 
-    def get_financial_summary(self, ticker, exchange, update=False):
+    def get_financial_summary(self, ticker, exchange, stage='Restated', update=False):
         '''
         Get financial summary statistics of stock
 
@@ -671,7 +671,7 @@ class Stock(StockBase):
             DataFrame of statistics
         '''
         statistics = 'Financial Summary'
-        return self._get_key_metrics(ticker, exchange, statistics, update)
+        return self._get_key_metrics(ticker, exchange, statistics, stage, update)
 
     def get_growth(self, ticker, exchange, update=False):
         '''
@@ -685,7 +685,7 @@ class Stock(StockBase):
             DataFrame of statistics
         '''
         statistics = 'Growth'
-        return self._get_key_metrics(ticker, exchange, statistics, update)
+        return self._get_key_metrics(ticker, exchange, statistics, stage='Restated', update=update)
 
     def get_profitability_and_efficiency(self, ticker, exchange, update=False):
         '''
@@ -698,7 +698,7 @@ class Stock(StockBase):
             DataFrame of statistics
         '''
         statistics = 'Profitability and Efficiency'
-        return self._get_key_metrics(ticker, exchange, statistics, update)
+        return self._get_key_metrics(ticker, exchange, statistics, stage='Restated', update=update)
 
     def get_financial_health(self, ticker, exchange, update=False):
         '''
@@ -711,7 +711,7 @@ class Stock(StockBase):
             DataFrame of statistics
         '''
         statistics = 'Financial Health'
-        return self._get_key_metrics(ticker, exchange, statistics, update)
+        return self._get_key_metrics(ticker, exchange, statistics, stage='Restated', update=update)
 
     def get_cash_flow(self, ticker, exchange, update=False):
         '''
@@ -724,9 +724,9 @@ class Stock(StockBase):
             DataFrame of statistics
         '''
         statistics = 'Cash Flow'
-        return self._get_key_metrics(ticker, exchange, statistics, update)
+        return self._get_key_metrics(ticker, exchange, statistics, stage='Restated', update=update)
 
-    def get_key_metrics(self, ticker, exchange, update=False):
+    def get_key_metrics(self, ticker, exchange, stage='Restated', update=False):
         '''
         Get all key metrics of stock
 
@@ -739,7 +739,7 @@ class Stock(StockBase):
 
         self.key_metrics = []
         for statistics in ['Financial Summary', 'Growth', 'Profitability and Efficiency', 'Financial Health', 'Cash Flow']:
-            df = self._get_key_metrics(ticker, exchange, statistics, update)
+            df = self._get_key_metrics(ticker, exchange, statistics, stage, update)
             self.key_metrics.append(df)
 
         return self.key_metrics
@@ -789,7 +789,7 @@ class Stock(StockBase):
         statement = 'Cash Flow'
         return self._get_financials(ticker, exchange, statement, period, stage, update)
 
-    def get_financials(self, ticker, exchange, period='Annual', stage='As Originally Reported', update=False):
+    def get_financials(self, ticker, exchange, period='Annual', stage='Restated', update=False):
         '''
         Get all financials statements of stock
 
@@ -797,7 +797,7 @@ class Stock(StockBase):
             ticker: Stock symbol
             exchange: Exchange name
             period: Period of statement, which can be 'Annual'(default), 'Quarterly'
-            stage: Stage of statement, which can be 'As Originally Reported'(default), 'Restated'
+            stage: Stage of statement, which can be 'As Originally Reported', 'Restated'(default)
         Returns:
             DataFrame list of financials statements
         '''

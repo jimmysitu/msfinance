@@ -29,10 +29,20 @@ tickers_list['xnas'] = initial_stock.get_xnas_tickers()
 tickers_list['xnys'] = initial_stock.get_xnys_tickers()
 tickers_list['xase'] = initial_stock.get_xase_tickers()
 
-# Configure logging
-logging.basicConfig(level=logging.INFO, format='%(processName)s - %(levelname)s - %(message)s')
+
+def setup_logging():
+    logger = logging.getLogger()
+    if not logger.hasHandlers():
+        handler = logging.StreamHandler()
+        formatter = logging.Formatter('%(processName)s:%(levelname)s:%(name)s: %(message)s')
+        handler.setFormatter(formatter)
+        logger.addHandler(handler)
+        logger.setLevel(logging.INFO)
+
+    return logger
 
 def process_tickers(tickers, proxy):
+    logger = setup_logging()  # Setup logging for each process
 
     SessionFactory = sessionmaker(bind=engine)
     # Create a Stock instance using the session
@@ -42,8 +52,7 @@ def process_tickers(tickers, proxy):
         proxy=proxy,
     )
 
-
-    logging.info(f"Processing tickers: {tickers}")
+    logger.info(f"Processing tickers: {tickers}")
 
     results = []
     for ticker in tickers:
@@ -73,7 +82,7 @@ def initializer():
 
 # Use ProcessPoolExecutor to process tickers in parallel
 max_workers = 4  # Adjust max_workers as needed
-chunk_size = 8
+chunk_size = 16
 ticker_chunks = [sp500_tickers[i:i + chunk_size] for i in range(0, len(sp500_tickers), chunk_size)]
 
 with ProcessPoolExecutor(max_workers=max_workers, initializer=initializer) as executor:
